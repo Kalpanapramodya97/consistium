@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  consistium:
+    build: .
+    container_name: consistium
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    # Resource limits for low-spec machines
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 32M
+        reservations:
+          cpus: '0.05'
+          memory: 8M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

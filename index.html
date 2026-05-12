@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Consistium — An atomic habit tracker inspired by James Clear. Build consistency, one day at a time." />
+  <title>Consistium — Atomic Habit Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <!-- Ambient Background -->
+    <div class="ambient-bg">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="header" id="header">
+      <div class="header-left">
+        <h1 class="logo">
+          <span class="logo-icon">◆</span>
+          <span class="logo-text">Consistium</span>
+        </h1>
+        <p class="tagline">"You do not rise to the level of your goals. You fall to the level of your systems."</p>
+      </div>
+      <div class="header-right">
+        <div class="streak-badge" id="streakBadge">
+          <span class="streak-fire">🔥</span>
+          <span class="streak-count" id="streakCount">0</span>
+          <span class="streak-label">day streak</span>
+        </div>
+        <button class="btn-icon" id="settingsBtn" title="Settings" aria-label="Settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Date Navigation -->
+    <section class="date-nav" id="dateNav">
+      <button class="date-arrow" id="prevDay" aria-label="Previous day">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="date-display" id="dateDisplay">
+        <span class="date-weekday" id="dateWeekday">Tuesday</span>
+        <span class="date-full" id="dateFull">May 12, 2026</span>
+      </div>
+      <button class="date-arrow" id="nextDay" aria-label="Next day">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </section>
+
+    <!-- Score Dashboard -->
+    <section class="dashboard" id="dashboard">
+      <div class="score-ring-container">
+        <svg class="score-ring" viewBox="0 0 120 120" id="scoreRing">
+          <circle class="score-ring-bg" cx="60" cy="60" r="52" />
+          <circle class="score-ring-fill" cx="60" cy="60" r="52" id="scoreRingFill" />
+        </svg>
+        <div class="score-text">
+          <span class="score-percent" id="scorePercent">0%</span>
+          <span class="score-sub">Today's score</span>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card" id="statTracked">
+          <span class="stat-value" id="habitsTracked">0</span>
+          <span class="stat-label">Tracked</span>
+        </div>
+        <div class="stat-card" id="statCompleted">
+          <span class="stat-value" id="habitsCompleted">0</span>
+          <span class="stat-label">Completed</span>
+        </div>
+        <div class="stat-card" id="statStatus">
+          <span class="stat-value stat-status" id="statusText">Pending</span>
+          <span class="stat-label">Status</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Motivation Banner -->
+    <div class="motivation-banner" id="motivationBanner" style="display: none;">
+      <div class="confetti-container" id="confettiContainer"></div>
+      <span class="motivation-emoji">🏆</span>
+      <span class="motivation-text">Perfect day — every habit completed!</span>
+    </div>
+
+    <!-- Habit List -->
+    <section class="habits-section">
+      <div class="habits-header">
+        <h2 class="section-title">Today's habits</h2>
+        <button class="btn-add" id="addHabitBtn" title="Add new habit" aria-label="Add new habit">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Add Habit</span>
+        </button>
+      </div>
+      <div class="habit-list" id="habitList"></div>
+      <p class="habit-hint" id="habitHint">Tap a pending habit to mark it done</p>
+    </section>
+
+    <!-- Weekly Heatmap -->
+    <section class="heatmap-section">
+      <h2 class="section-title">Weekly Overview</h2>
+      <div class="heatmap" id="weeklyHeatmap"></div>
+    </section>
+
+    <!-- Quotes Section -->
+    <section class="quotes-section">
+      <div class="quote-card" id="quoteCard">
+        <svg class="quote-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z"/></svg>
+        <p class="quote-text" id="quoteText">Every action you take is a vote for the type of person you wish to become.</p>
+        <span class="quote-author">— James Clear, Atomic Habits</span>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>Built with <span class="footer-heart">♦</span> Consistium &mdash; 1% better every day</p>
+    </footer>
+  </div>
+
+  <!-- Add/Edit Habit Modal -->
+  <div class="modal-overlay" id="habitModal" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalTitle">Add New Habit</h3>
+        <button class="btn-icon modal-close" id="modalCloseBtn" aria-label="Close modal">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="habitForm">
+        <div class="form-group">
+          <label for="habitEmoji">Emoji</label>
+          <div class="emoji-picker" id="emojiPicker">
+            <button type="button" class="emoji-opt" data-emoji="📚">📚</button>
+            <button type="button" class="emoji-opt" data-emoji="💪">💪</button>
+            <button type="button" class="emoji-opt" data-emoji="🗣️">🗣️</button>
+            <button type="button" class="emoji-opt" data-emoji="💻">💻</button>
+            <button type="button" class="emoji-opt" data-emoji="📝">📝</button>
+            <button type="button" class="emoji-opt" data-emoji="💼">💼</button>
+            <button type="button" class="emoji-opt" data-emoji="🧘">🧘</button>
+            <button type="button" class="emoji-opt" data-emoji="🏃">🏃</button>
+            <button type="button" class="emoji-opt" data-emoji="💧">💧</button>
+            <button type="button" class="emoji-opt" data-emoji="🎯">🎯</button>
+            <button type="button" class="emoji-opt" data-emoji="✍️">✍️</button>
+            <button type="button" class="emoji-opt" data-emoji="🎵">🎵</button>
+            <button type="button" class="emoji-opt" data-emoji="🥗">🥗</button>
+            <button type="button" class="emoji-opt" data-emoji="😴">😴</button>
+            <button type="button" class="emoji-opt" data-emoji="🧠">🧠</button>
+            <button type="button" class="emoji-opt" data-emoji="📱">📱</button>
+          </div>
+          <input type="hidden" id="habitEmoji" value="🎯" />
+        </div>
+        <div class="form-group">
+          <label for="habitName">Habit Name</label>
+          <input type="text" id="habitName" placeholder="e.g. Read 10 pages" required autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="habitIsNew" />
+            Mark as <span class="new-badge-sm">New</span>
+          </label>
+        </div>
+        <input type="hidden" id="habitEditId" value="" />
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="deleteHabitBtn" style="display: none;">Delete</button>
+          <button type="submit" class="btn btn-primary" id="saveHabitBtn">Add Habit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Settings</h3>
+        <button class="btn-icon modal-close" id="settingsCloseBtn" aria-label="Close settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="settings-body">
+        <div class="setting-row">
+          <span>Export Data</span>
+          <button class="btn btn-secondary btn-sm" id="exportBtn">Export JSON</button>
+        </div>
+        <div class="setting-row">
+          <span>Import Data</span>
+          <input type="file" id="importFile" accept=".json" style="display:none" />
+          <button class="btn btn-secondary btn-sm" id="importBtn">Import JSON</button>
+        </div>
+        <div class="setting-row setting-danger">
+          <span>Reset All Data</span>
+          <button class="btn btn-danger btn-sm" id="resetBtn">Reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
