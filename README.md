@@ -7,6 +7,8 @@
 ## ✨ Features
 
 - **Daily Habit Tracking** — Tap to mark habits complete with satisfying animations
+- **Good vs. Bad Habits** — Build positive routines or track habits you're trying to break
+- **Reverse Logic for Bad Habits** — Bad habits are marked as "Resisted" (complete) by default and only "Slipped" if checked
 - **Score Ring** — Visual progress indicator with animated percentage
 - **Streak Counter** — Track consecutive perfect days
 - **Weekly Heatmap** — See your weekly consistency at a glance
@@ -19,7 +21,14 @@
 - **Keyboard Shortcuts** — Arrow keys for navigation, Escape to close modals
 - **Responsive Design** — Works beautifully on mobile and desktop
 
-## 🚀 Getting Started
+## 🔄 Habit Types
+ 
+ Consistium supports two types of habits to help you design your ideal life:
+ 
+- **Good Habits (Build)** — Activities you want to perform. They are marked as "Done" when checked.
+- **Bad Habits (Break)** — Activities you want to avoid. These use reverse logic: they are marked as **"Resisted ✓"** (successful) by default. If you perform the habit, you check it to mark it as **"Slipped ✗"**.
+ 
+ ## 🚀 Getting Started
 
 Simply open `index.html` in any modern browser. No build tools, no dependencies, no server required.
 
