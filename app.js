@@ -29,12 +29,12 @@
   ];
 
   const DEFAULT_HABITS = [
-    { id: genId(), emoji: '📚', name: 'Read 10 pages', isNew: false },
-    { id: genId(), emoji: '💪', name: 'Gym workout', isNew: false },
-    { id: genId(), emoji: '🗣️', name: 'Table topic speech', isNew: false },
-    { id: genId(), emoji: '💻', name: 'DevOps tutorials × 2', isNew: false },
-    { id: genId(), emoji: '📝', name: '12 job applications', isNew: false },
-    { id: genId(), emoji: '💼', name: 'Message 5 LinkedIn recruiters & comment on 2 posts', isNew: true },
+    { id: genId(), emoji: '📚', name: 'Read 10 pages', isNew: false, type: 'good' },
+    { id: genId(), emoji: '💪', name: 'Gym workout', isNew: false, type: 'good' },
+    { id: genId(), emoji: '🗣️', name: 'Table topic speech', isNew: false, type: 'good' },
+    { id: genId(), emoji: '💻', name: 'DevOps tutorials × 2', isNew: false, type: 'good' },
+    { id: genId(), emoji: '📝', name: '12 job applications', isNew: false, type: 'good' },
+    { id: genId(), emoji: '💼', name: 'Message 5 LinkedIn recruiters & comment on 2 posts', isNew: true, type: 'good' },
   ];
 
   // ── State ──
@@ -58,7 +58,12 @@
     statusText: $('#statusText'),
     motivationBanner: $('#motivationBanner'),
     confettiContainer: $('#confettiContainer'),
-    habitList: $('#habitList'),
+    goodHabitList: $('#goodHabitList'),
+    badHabitList: $('#badHabitList'),
+    goodHabitCount: $('#goodHabitCount'),
+    badHabitCount: $('#badHabitCount'),
+    goodHabitsHeader: $('#goodHabitsHeader'),
+    badHabitsHeader: $('#badHabitsHeader'),
     habitHint: $('#habitHint'),
     weeklyHeatmap: $('#weeklyHeatmap'),
     quoteText: $('#quoteText'),
@@ -71,6 +76,8 @@
     habitEmoji: $('#habitEmoji'),
     habitName: $('#habitName'),
     habitIsNew: $('#habitIsNew'),
+    habitType: $('#habitType'),
+    habitTypeToggle: $('#habitTypeToggle'),
     habitEditId: $('#habitEditId'),
     saveHabitBtn: $('#saveHabitBtn'),
     deleteHabitBtn: $('#deleteHabitBtn'),
@@ -160,26 +167,28 @@
     dom.dateFull.textContent = `${MONTHS[currentDate.getMonth()]} ${currentDate.getDate()}, ${currentDate.getFullYear()}`;
   }
 
+  function getHabitScore(habit, completions) {
+    // Good habits: done when checked. Bad habits: done when NOT checked (resisted).
+    if (habit.type === 'bad') return !completions[habit.id];
+    return !!completions[habit.id];
+  }
+
   function renderScore() {
     const key = dateKey(currentDate);
     const completions = state.completions[key] || {};
     const total = state.habits.length;
-    const done = state.habits.filter(h => completions[h.id]).length;
+    const done = state.habits.filter(h => getHabitScore(h, completions)).length;
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
-    // Animate percent text
     animateValue(dom.scorePercent, pct, '%');
 
-    // Ring
-    const circumference = 2 * Math.PI * 52; // ~326.73
+    const circumference = 2 * Math.PI * 52;
     const offset = circumference - (pct / 100) * circumference;
     dom.scoreRingFill.style.strokeDashoffset = offset;
 
-    // Stats
     dom.habitsTracked.textContent = total;
     dom.habitsCompleted.textContent = `${done}/${total}`;
 
-    // Status
     if (done === 0) {
       dom.statusText.textContent = 'Pending';
       dom.statusText.style.color = 'var(--text-muted)';
@@ -191,7 +200,6 @@
       dom.statusText.style.color = 'var(--success)';
     }
 
-    // Motivation banner
     if (done === total && total > 0) {
       dom.motivationBanner.style.display = 'flex';
       spawnConfetti();
@@ -199,13 +207,12 @@
       dom.motivationBanner.style.display = 'none';
     }
 
-    // Hint
     if (done === total && total > 0) {
-      dom.habitHint.textContent = 'All habits done! Perfect day 🏆';
+      dom.habitHint.textContent = 'All habits on track! Perfect day 🏆';
     } else if (isFuture(currentDate)) {
       dom.habitHint.textContent = 'Future date — habits will unlock on that day';
     } else {
-      dom.habitHint.textContent = 'Tap a pending habit to mark it done';
+      dom.habitHint.textContent = 'Tap a habit to update its status';
     }
   }
 
@@ -224,50 +231,73 @@
     }, stepTime);
   }
 
+  function buildHabitCard(habit, completions, index) {
+    const isChecked = !!completions[habit.id];
+    const isBad = habit.type === 'bad';
+    let statusLabel, cardClass;
+
+    if (isBad) {
+      statusLabel = isChecked ? 'Slipped ✗' : 'Resisted ✓';
+      cardClass = `habit-card bad-habit${isChecked ? ' slipped' : ' resisted'}`;
+    } else {
+      statusLabel = isChecked ? 'Done' : 'Pending';
+      cardClass = `habit-card${isChecked ? ' done' : ''}`;
+    }
+
+    const card = document.createElement('div');
+    card.className = cardClass;
+    card.style.animationDelay = `${index * 0.05}s`;
+    card.dataset.id = habit.id;
+
+    const checkIcon = isBad && isChecked
+      ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+      : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+    card.innerHTML = `
+      <div class="habit-emoji">${habit.emoji}</div>
+      <div class="habit-info">
+        <div class="habit-name">
+          ${habit.name}
+          ${habit.isNew ? '<span class="new-badge">New</span>' : ''}
+          ${isBad ? '<span class="bad-badge">Break</span>' : ''}
+        </div>
+        <div class="habit-status-label">${statusLabel}</div>
+      </div>
+      <button class="habit-edit-btn" data-edit="${habit.id}" title="Edit" aria-label="Edit ${habit.name}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+      <div class="habit-check">${checkIcon}</div>
+    `;
+
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.habit-edit-btn')) return;
+      toggleHabit(habit.id);
+    });
+
+    card.querySelector('.habit-edit-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditModal(habit);
+    });
+
+    return card;
+  }
+
   function renderHabits() {
     const key = dateKey(currentDate);
     const completions = state.completions[key] || {};
-    dom.habitList.innerHTML = '';
+    dom.goodHabitList.innerHTML = '';
+    dom.badHabitList.innerHTML = '';
 
-    state.habits.forEach((habit, i) => {
-      const isDone = !!completions[habit.id];
-      const card = document.createElement('div');
-      card.className = `habit-card${isDone ? ' done' : ''}`;
-      card.style.animationDelay = `${i * 0.05}s`;
-      card.dataset.id = habit.id;
+    const goodHabits = state.habits.filter(h => h.type !== 'bad');
+    const badHabits = state.habits.filter(h => h.type === 'bad');
 
-      card.innerHTML = `
-        <div class="habit-emoji">${habit.emoji}</div>
-        <div class="habit-info">
-          <div class="habit-name">
-            ${habit.name}
-            ${habit.isNew ? '<span class="new-badge">New</span>' : ''}
-          </div>
-          <div class="habit-status-label">${isDone ? 'Done' : 'Pending'}</div>
-        </div>
-        <button class="habit-edit-btn" data-edit="${habit.id}" title="Edit habit" aria-label="Edit ${habit.name}">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
-        <div class="habit-check">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        </div>
-      `;
+    goodHabits.forEach((h, i) => dom.goodHabitList.appendChild(buildHabitCard(h, completions, i)));
+    badHabits.forEach((h, i) => dom.badHabitList.appendChild(buildHabitCard(h, completions, i)));
 
-      // Toggle completion on card click
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('.habit-edit-btn')) return;
-        toggleHabit(habit.id);
-      });
-
-      // Edit button
-      const editBtn = card.querySelector('.habit-edit-btn');
-      editBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openEditModal(habit);
-      });
-
-      dom.habitList.appendChild(card);
-    });
+    dom.goodHabitCount.textContent = goodHabits.length;
+    dom.badHabitCount.textContent = badHabits.length;
+    dom.goodHabitsHeader.style.display = goodHabits.length ? 'flex' : 'none';
+    dom.badHabitsHeader.style.display = badHabits.length ? 'flex' : 'none';
   }
 
   function renderStreak() {
@@ -279,7 +309,7 @@
     const checkDate = new Date(today);
     const todayKey = dateKey(today);
     const todayCompletions = state.completions[todayKey] || {};
-    const todayDone = state.habits.every(h => todayCompletions[h.id]);
+    const todayDone = state.habits.every(h => getHabitScore(h, todayCompletions));
 
     if (!todayDone) {
       checkDate.setDate(checkDate.getDate() - 1);
@@ -288,7 +318,7 @@
     while (true) {
       const key = dateKey(checkDate);
       const completions = state.completions[key] || {};
-      const allDone = state.habits.length > 0 && state.habits.every(h => completions[h.id]);
+      const allDone = state.habits.length > 0 && state.habits.every(h => getHabitScore(h, completions));
       if (!allDone) break;
       streak++;
       checkDate.setDate(checkDate.getDate() - 1);
@@ -316,7 +346,7 @@
       const key = dateKey(d);
       const completions = state.completions[key] || {};
       const total = state.habits.length;
-      const done = state.habits.filter(h => completions[h.id]).length;
+      const done = state.habits.filter(h => getHabitScore(h, completions)).length;
       const pct = total > 0 ? done / total : 0;
 
       let level = 0;
@@ -388,6 +418,21 @@
   }
 
   // ── Modal Logic ──
+  function setModalType(type) {
+    dom.habitType.value = type;
+    $$('.type-opt').forEach(b => b.classList.toggle('selected', b.dataset.type === type));
+    // Toggle emoji visibility
+    $$('.emoji-good').forEach(b => b.style.display = type === 'good' ? '' : 'none');
+    $$('.emoji-bad').forEach(b => b.style.display = type === 'bad' ? '' : 'none');
+    // Clear emoji selection and pick first visible default
+    $$('.emoji-opt').forEach(b => b.classList.remove('selected'));
+    const defaultEmoji = type === 'bad' ? '🚬' : '🎯';
+    const def = document.querySelector(`.emoji-opt[data-emoji="${defaultEmoji}"]`);
+    if (def) { def.classList.add('selected'); dom.habitEmoji.value = defaultEmoji; }
+    // Update placeholder
+    dom.habitName.placeholder = type === 'bad' ? 'e.g. Doom scrolling' : 'e.g. Read 10 pages';
+  }
+
   function openAddModal() {
     dom.modalTitle.textContent = 'Add New Habit';
     dom.saveHabitBtn.textContent = 'Add Habit';
@@ -395,10 +440,7 @@
     dom.habitName.value = '';
     dom.habitIsNew.checked = false;
     dom.habitEditId.value = '';
-    dom.habitEmoji.value = '🎯';
-    $$('.emoji-opt').forEach(b => b.classList.remove('selected'));
-    const defaultEmoji = document.querySelector('.emoji-opt[data-emoji="🎯"]');
-    if (defaultEmoji) defaultEmoji.classList.add('selected');
+    setModalType('good');
     dom.habitModal.style.display = 'flex';
     dom.habitName.focus();
   }
@@ -410,10 +452,9 @@
     dom.habitName.value = habit.name;
     dom.habitIsNew.checked = habit.isNew;
     dom.habitEditId.value = habit.id;
+    setModalType(habit.type || 'good');
     dom.habitEmoji.value = habit.emoji;
-    $$('.emoji-opt').forEach(b => {
-      b.classList.toggle('selected', b.dataset.emoji === habit.emoji);
-    });
+    $$('.emoji-opt').forEach(b => b.classList.toggle('selected', b.dataset.emoji === habit.emoji));
     dom.habitModal.style.display = 'flex';
     dom.habitName.focus();
   }
@@ -430,6 +471,7 @@
     const editId = dom.habitEditId.value;
     const emoji = dom.habitEmoji.value;
     const isNew = dom.habitIsNew.checked;
+    const type = dom.habitType.value || 'good';
 
     if (editId) {
       const habit = state.habits.find(h => h.id === editId);
@@ -437,9 +479,10 @@
         habit.name = name;
         habit.emoji = emoji;
         habit.isNew = isNew;
+        habit.type = type;
       }
     } else {
-      state.habits.push({ id: genId(), emoji, name, isNew });
+      state.habits.push({ id: genId(), emoji, name, isNew, type });
     }
 
     saveState();
@@ -537,6 +580,13 @@
     });
     dom.habitForm.addEventListener('submit', saveHabit);
     dom.deleteHabitBtn.addEventListener('click', deleteHabit);
+
+    // Habit type toggle
+    $$('.type-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setModalType(btn.dataset.type);
+      });
+    });
 
     // Emoji picker
     $$('.emoji-opt').forEach(btn => {

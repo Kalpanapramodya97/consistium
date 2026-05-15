@@ -570,6 +570,96 @@ body {
 
 .setting-danger { border-color: rgba(239, 68, 68, 0.2); }
 
+/* Habit Type Headers */
+.habit-type-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; margin: 16px 0 8px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(34, 197, 94, 0.03));
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  border-radius: var(--radius-sm); font-size: 0.78rem;
+}
+
+.habit-type-header.bad {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.03));
+  border-color: rgba(239, 68, 68, 0.15);
+}
+
+.habit-type-icon { font-size: 1rem; }
+
+.habit-type-label {
+  flex: 1; font-weight: 600; color: var(--text-secondary);
+}
+
+.habit-type-count {
+  font-family: var(--mono); font-weight: 700; font-size: 0.8rem;
+  color: var(--accent); background: var(--bg-secondary);
+  padding: 2px 8px; border-radius: 10px;
+}
+
+/* Bad Habit Card Styles */
+.habit-card.bad-habit {
+  border-left: 3px solid rgba(239, 68, 68, 0.3);
+}
+
+.habit-card.bad-habit.resisted {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.04), var(--bg-card));
+}
+
+.habit-card.bad-habit.resisted .habit-status-label { color: var(--success); }
+
+.habit-card.bad-habit.slipped {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), var(--bg-card));
+}
+
+.habit-card.bad-habit.slipped .habit-name { color: var(--text-secondary); }
+.habit-card.bad-habit.slipped .habit-status-label { color: var(--danger); }
+
+.habit-card.bad-habit.slipped .habit-check {
+  background: var(--danger); border-color: var(--danger);
+  animation: checkPop 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.habit-card.bad-habit.slipped .habit-check svg { opacity: 1; }
+
+.bad-badge {
+  display: inline-block; padding: 1px 7px; border-radius: 4px;
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+}
+
+/* Habit Type Toggle in Modal */
+.habit-type-toggle {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+
+.type-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 12px 8px; background: var(--bg-card);
+  border: 2px solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer; transition: var(--transition);
+  font-family: var(--font); color: var(--text-secondary);
+}
+
+.type-opt:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+.type-opt.selected {
+  border-color: var(--accent); background: var(--accent-glow);
+  color: var(--text-primary);
+}
+
+.type-opt[data-type="bad"].selected {
+  border-color: var(--danger);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.type-opt-icon { font-size: 1.3rem; }
+.type-opt-text { font-size: 0.82rem; font-weight: 600; }
+.type-opt-desc { font-size: 0.65rem; color: var(--text-muted); }
+
 /* Responsive */
 @media (max-width: 480px) {
   .app { padding: 12px 12px 32px; }

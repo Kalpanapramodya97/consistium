@@ -98,7 +98,23 @@
           <span>Add Habit</span>
         </button>
       </div>
-      <div class="habit-list" id="habitList"></div>
+
+      <!-- Good Habits -->
+      <div class="habit-type-header" id="goodHabitsHeader">
+        <span class="habit-type-icon">✅</span>
+        <span class="habit-type-label">Good Habits — Build these</span>
+        <span class="habit-type-count" id="goodHabitCount">0</span>
+      </div>
+      <div class="habit-list" id="goodHabitList"></div>
+
+      <!-- Bad Habits -->
+      <div class="habit-type-header bad" id="badHabitsHeader">
+        <span class="habit-type-icon">🚫</span>
+        <span class="habit-type-label">Bad Habits — Break these</span>
+        <span class="habit-type-count" id="badHabitCount">0</span>
+      </div>
+      <div class="habit-list" id="badHabitList"></div>
+
       <p class="habit-hint" id="habitHint">Tap a pending habit to mark it done</p>
     </section>
 
@@ -134,24 +150,58 @@
       </div>
       <form id="habitForm">
         <div class="form-group">
+          <label>Habit Type</label>
+          <div class="habit-type-toggle" id="habitTypeToggle">
+            <button type="button" class="type-opt selected" data-type="good">
+              <span class="type-opt-icon">✅</span>
+              <span class="type-opt-text">Good Habit</span>
+              <span class="type-opt-desc">Build & repeat</span>
+            </button>
+            <button type="button" class="type-opt" data-type="bad">
+              <span class="type-opt-icon">🚫</span>
+              <span class="type-opt-text">Bad Habit</span>
+              <span class="type-opt-desc">Break & avoid</span>
+            </button>
+          </div>
+          <input type="hidden" id="habitType" value="good" />
+        </div>
+        <div class="form-group">
           <label for="habitEmoji">Emoji</label>
           <div class="emoji-picker" id="emojiPicker">
-            <button type="button" class="emoji-opt" data-emoji="📚">📚</button>
-            <button type="button" class="emoji-opt" data-emoji="💪">💪</button>
-            <button type="button" class="emoji-opt" data-emoji="🗣️">🗣️</button>
-            <button type="button" class="emoji-opt" data-emoji="💻">💻</button>
-            <button type="button" class="emoji-opt" data-emoji="📝">📝</button>
-            <button type="button" class="emoji-opt" data-emoji="💼">💼</button>
-            <button type="button" class="emoji-opt" data-emoji="🧘">🧘</button>
-            <button type="button" class="emoji-opt" data-emoji="🏃">🏃</button>
-            <button type="button" class="emoji-opt" data-emoji="💧">💧</button>
-            <button type="button" class="emoji-opt" data-emoji="🎯">🎯</button>
-            <button type="button" class="emoji-opt" data-emoji="✍️">✍️</button>
-            <button type="button" class="emoji-opt" data-emoji="🎵">🎵</button>
-            <button type="button" class="emoji-opt" data-emoji="🥗">🥗</button>
-            <button type="button" class="emoji-opt" data-emoji="😴">😴</button>
-            <button type="button" class="emoji-opt" data-emoji="🧠">🧠</button>
-            <button type="button" class="emoji-opt" data-emoji="📱">📱</button>
+            <!-- Good habit emojis -->
+            <button type="button" class="emoji-opt emoji-good" data-emoji="📚">📚</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="💪">💪</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="🗣️">🗣️</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="💻">💻</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="📝">📝</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="💼">💼</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="🧘">🧘</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="🏃">🏃</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="💧">💧</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="🎯">🎯</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="✍️">✍️</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="🎵">🎵</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="🥗">🥗</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="😴">😴</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="🧠">🧠</button>
+            <button type="button" class="emoji-opt emoji-good" data-emoji="📱">📱</button>
+            <!-- Bad habit emojis -->
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="🚬" style="display:none;">🚬</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="🍺" style="display:none;">🍺</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="🍔" style="display:none;">🍔</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="🍩" style="display:none;">🍩</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="📱" style="display:none;">📱</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="🎮" style="display:none;">🎮</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="😤" style="display:none;">😤</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="💤" style="display:none;">💤</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="🛋️" style="display:none;">🛋️</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="☕" style="display:none;">☕</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="🍭" style="display:none;">🍭</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="💸" style="display:none;">💸</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="🤬" style="display:none;">🤬</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="👎" style="display:none;">👎</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="⏰" style="display:none;">⏰</button>
+            <button type="button" class="emoji-opt emoji-bad" data-emoji="🥤" style="display:none;">🥤</button>
           </div>
           <input type="hidden" id="habitEmoji" value="🎯" />
         </div>
