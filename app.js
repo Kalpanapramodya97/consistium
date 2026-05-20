@@ -62,8 +62,11 @@
     badHabitList: $('#badHabitList'),
     goodHabitCount: $('#goodHabitCount'),
     badHabitCount: $('#badHabitCount'),
+    specialTaskCount: $('#specialTaskCount'),
     goodHabitsHeader: $('#goodHabitsHeader'),
     badHabitsHeader: $('#badHabitsHeader'),
+    specialTasksHeader: $('#specialTasksHeader'),
+    specialTaskList: $('#specialTaskList'),
     habitHint: $('#habitHint'),
     weeklyHeatmap: $('#weeklyHeatmap'),
     quoteText: $('#quoteText'),
@@ -128,12 +131,16 @@
       if (raw) {
         const parsed = JSON.parse(raw);
         // Validate structure
-        if (parsed.habits && parsed.completions) return parsed;
+        if (parsed.habits && parsed.completions) {
+          parsed.tasks = parsed.tasks || {};
+          return parsed;
+        }
       }
     } catch (e) { /* ignore */ }
     return {
       habits: DEFAULT_HABITS,
-      completions: {} // { "2026-05-12": { habitId: true } }
+      completions: {}, // { "2026-05-12": { habitId: true } }
+      tasks: {} // { "2026-05-12": [{ id, name, emoji, isCompleted }] }
     };
   }
 
@@ -176,8 +183,12 @@
   function renderScore() {
     const key = dateKey(currentDate);
     const completions = state.completions[key] || {};
-    const total = state.habits.length;
-    const done = state.habits.filter(h => getHabitScore(h, completions)).length;
+    const todayTasks = state.tasks[key] || [];
+    
+    const total = state.habits.length + todayTasks.length;
+    let done = state.habits.filter(h => getHabitScore(h, completions)).length;
+    done += todayTasks.filter(t => t.isCompleted).length;
+    
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
     animateValue(dom.scorePercent, pct, '%');
@@ -282,22 +293,69 @@
     return card;
   }
 
+  function buildTaskCard(task, key, index) {
+    const isChecked = task.isCompleted;
+    const statusLabel = isChecked ? 'Done' : 'Pending';
+    const cardClass = `habit-card${isChecked ? ' done' : ''}`;
+
+    const card = document.createElement('div');
+    card.className = cardClass;
+    card.style.animationDelay = `${index * 0.05}s`;
+    card.dataset.id = task.id;
+
+    const checkIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+    card.innerHTML = `
+      <div class="habit-emoji">${task.emoji}</div>
+      <div class="habit-info">
+        <div class="habit-name">
+          ${task.name}
+          <span class="special-badge">Special</span>
+        </div>
+        <div class="habit-status-label">${statusLabel}</div>
+      </div>
+      <button class="habit-edit-btn" data-edit="${task.id}" title="Edit" aria-label="Edit ${task.name}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+      <div class="habit-check">${checkIcon}</div>
+    `;
+
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.habit-edit-btn')) return;
+      toggleTask(task.id, key);
+    });
+
+    card.querySelector('.habit-edit-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditModal({ ...task, type: 'task' });
+    });
+
+    return card;
+  }
+
   function renderHabits() {
     const key = dateKey(currentDate);
     const completions = state.completions[key] || {};
+    const tasks = state.tasks[key] || [];
+    
     dom.goodHabitList.innerHTML = '';
     dom.badHabitList.innerHTML = '';
+    dom.specialTaskList.innerHTML = '';
 
     const goodHabits = state.habits.filter(h => h.type !== 'bad');
     const badHabits = state.habits.filter(h => h.type === 'bad');
 
     goodHabits.forEach((h, i) => dom.goodHabitList.appendChild(buildHabitCard(h, completions, i)));
     badHabits.forEach((h, i) => dom.badHabitList.appendChild(buildHabitCard(h, completions, i)));
+    tasks.forEach((t, i) => dom.specialTaskList.appendChild(buildTaskCard(t, key, i)));
 
     dom.goodHabitCount.textContent = goodHabits.length;
     dom.badHabitCount.textContent = badHabits.length;
+    dom.specialTaskCount.textContent = tasks.length;
+    
     dom.goodHabitsHeader.style.display = goodHabits.length ? 'flex' : 'none';
     dom.badHabitsHeader.style.display = badHabits.length ? 'flex' : 'none';
+    dom.specialTasksHeader.style.display = tasks.length ? 'flex' : 'none';
   }
 
   function renderStreak() {
@@ -309,7 +367,9 @@
     const checkDate = new Date(today);
     const todayKey = dateKey(today);
     const todayCompletions = state.completions[todayKey] || {};
-    const todayDone = state.habits.every(h => getHabitScore(h, todayCompletions));
+    const todayTasks = state.tasks[todayKey] || [];
+    const todayDone = state.habits.every(h => getHabitScore(h, todayCompletions)) &&
+                      (todayTasks.length === 0 || todayTasks.every(t => t.isCompleted));
 
     if (!todayDone) {
       checkDate.setDate(checkDate.getDate() - 1);
@@ -318,7 +378,10 @@
     while (true) {
       const key = dateKey(checkDate);
       const completions = state.completions[key] || {};
-      const allDone = state.habits.length > 0 && state.habits.every(h => getHabitScore(h, completions));
+      const tasks = state.tasks[key] || [];
+      const hasHabits = state.habits.length > 0;
+      const allDone = hasHabits && state.habits.every(h => getHabitScore(h, completions)) &&
+                      (tasks.length === 0 || tasks.every(t => t.isCompleted));
       if (!allDone) break;
       streak++;
       checkDate.setDate(checkDate.getDate() - 1);
@@ -345,8 +408,12 @@
       d.setDate(startOfWeek.getDate() + i);
       const key = dateKey(d);
       const completions = state.completions[key] || {};
-      const total = state.habits.length;
-      const done = state.habits.filter(h => getHabitScore(h, completions)).length;
+      const tasks = state.tasks[key] || [];
+      
+      const total = state.habits.length + tasks.length;
+      let done = state.habits.filter(h => getHabitScore(h, completions)).length;
+      done += tasks.filter(t => t.isCompleted).length;
+      
       const pct = total > 0 ? done / total : 0;
 
       let level = 0;
@@ -417,12 +484,22 @@
     }
   }
 
+  function toggleTask(taskId, key) {
+    if (!state.tasks[key]) return;
+    const task = state.tasks[key].find(t => t.id === taskId);
+    if (task) {
+      task.isCompleted = !task.isCompleted;
+      saveState();
+      renderAll();
+    }
+  }
+
   // ── Modal Logic ──
   function setModalType(type) {
     dom.habitType.value = type;
     $$('.type-opt').forEach(b => b.classList.toggle('selected', b.dataset.type === type));
     // Toggle emoji visibility
-    $$('.emoji-good').forEach(b => b.style.display = type === 'good' ? '' : 'none');
+    $$('.emoji-good').forEach(b => b.style.display = (type === 'good' || type === 'task') ? '' : 'none');
     $$('.emoji-bad').forEach(b => b.style.display = type === 'bad' ? '' : 'none');
     // Clear emoji selection and pick first visible default
     $$('.emoji-opt').forEach(b => b.classList.remove('selected'));
@@ -430,7 +507,7 @@
     const def = document.querySelector(`.emoji-opt[data-emoji="${defaultEmoji}"]`);
     if (def) { def.classList.add('selected'); dom.habitEmoji.value = defaultEmoji; }
     // Update placeholder
-    dom.habitName.placeholder = type === 'bad' ? 'e.g. Doom scrolling' : 'e.g. Read 10 pages';
+    dom.habitName.placeholder = type === 'bad' ? 'e.g. Doom scrolling' : (type === 'task' ? 'e.g. Call dentist' : 'e.g. Read 10 pages');
   }
 
   function openAddModal() {
@@ -473,16 +550,30 @@
     const isNew = dom.habitIsNew.checked;
     const type = dom.habitType.value || 'good';
 
-    if (editId) {
-      const habit = state.habits.find(h => h.id === editId);
-      if (habit) {
-        habit.name = name;
-        habit.emoji = emoji;
-        habit.isNew = isNew;
-        habit.type = type;
+    if (type === 'task') {
+      const key = dateKey(currentDate);
+      if (!state.tasks[key]) state.tasks[key] = [];
+      if (editId) {
+        const task = state.tasks[key].find(t => t.id === editId);
+        if (task) {
+          task.name = name;
+          task.emoji = emoji;
+        }
+      } else {
+        state.tasks[key].push({ id: genId(), emoji, name, isCompleted: false });
       }
     } else {
-      state.habits.push({ id: genId(), emoji, name, isNew, type });
+      if (editId) {
+        const habit = state.habits.find(h => h.id === editId);
+        if (habit) {
+          habit.name = name;
+          habit.emoji = emoji;
+          habit.isNew = isNew;
+          habit.type = type;
+        }
+      } else {
+        state.habits.push({ id: genId(), emoji, name, isNew, type });
+      }
     }
 
     saveState();
@@ -492,14 +583,22 @@
 
   function deleteHabit() {
     const editId = dom.habitEditId.value;
+    const type = dom.habitType.value;
     if (!editId) return;
-    if (!confirm('Delete this habit? This cannot be undone.')) return;
+    if (!confirm('Delete this? This cannot be undone.')) return;
 
-    state.habits = state.habits.filter(h => h.id !== editId);
-    // Clean up completions
-    Object.keys(state.completions).forEach(key => {
-      delete state.completions[key][editId];
-    });
+    if (type === 'task') {
+      const key = dateKey(currentDate);
+      if (state.tasks[key]) {
+        state.tasks[key] = state.tasks[key].filter(t => t.id !== editId);
+      }
+    } else {
+      state.habits = state.habits.filter(h => h.id !== editId);
+      // Clean up completions
+      Object.keys(state.completions).forEach(key => {
+        delete state.completions[key][editId];
+      });
+    }
 
     saveState();
     closeModal();
@@ -547,7 +646,7 @@
     if (!confirm('Reset all data? This will delete all habits and history.')) return;
     if (!confirm('Are you absolutely sure?')) return;
     localStorage.removeItem(STORAGE_KEY);
-    state = { habits: DEFAULT_HABITS.map(h => ({ ...h, id: genId() })), completions: {} };
+    state = { habits: DEFAULT_HABITS.map(h => ({ ...h, id: genId() })), completions: {}, tasks: {} };
     saveState();
     renderAll();
     dom.settingsModal.style.display = 'none';

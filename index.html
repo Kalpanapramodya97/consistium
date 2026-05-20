@@ -115,6 +115,14 @@
       </div>
       <div class="habit-list" id="badHabitList"></div>
 
+      <!-- Special Tasks -->
+      <div class="habit-type-header special" id="specialTasksHeader" style="display: none;">
+        <span class="habit-type-icon">🌟</span>
+        <span class="habit-type-label">Special Tasks — One-time</span>
+        <span class="habit-type-count" id="specialTaskCount">0</span>
+      </div>
+      <div class="habit-list" id="specialTaskList"></div>
+
       <p class="habit-hint" id="habitHint">Tap a pending habit to mark it done</p>
     </section>
 
@@ -161,6 +169,11 @@
               <span class="type-opt-icon">🚫</span>
               <span class="type-opt-text">Bad Habit</span>
               <span class="type-opt-desc">Break & avoid</span>
+            </button>
+            <button type="button" class="type-opt" data-type="task">
+              <span class="type-opt-icon">🌟</span>
+              <span class="type-opt-text">Special Task</span>
+              <span class="type-opt-desc">One-time today</span>
             </button>
           </div>
           <input type="hidden" id="habitType" value="good" />

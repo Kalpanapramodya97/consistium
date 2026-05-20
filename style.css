@@ -584,6 +584,11 @@ body {
   border-color: rgba(239, 68, 68, 0.15);
 }
 
+.habit-type-header.special {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(245, 158, 11, 0.03));
+  border-color: rgba(245, 158, 11, 0.15);
+}
+
 .habit-type-icon { font-size: 1rem; }
 
 .habit-type-label {
@@ -631,9 +636,17 @@ body {
   color: #fff;
 }
 
+.special-badge {
+  display: inline-block; padding: 1px 7px; border-radius: 4px;
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, var(--warning), #d97706);
+  color: #fff;
+}
+
 /* Habit Type Toggle in Modal */
 .habit-type-toggle {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
 }
 
 .type-opt {
@@ -654,6 +667,11 @@ body {
 .type-opt[data-type="bad"].selected {
   border-color: var(--danger);
   background: rgba(239, 68, 68, 0.12);
+}
+
+.type-opt[data-type="task"].selected {
+  border-color: var(--warning);
+  background: rgba(245, 158, 11, 0.12);
 }
 
 .type-opt-icon { font-size: 1.3rem; }
