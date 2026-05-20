@@ -8,6 +8,7 @@
 
 - **Daily Habit Tracking** — Tap to mark habits complete with satisfying animations
 - **Good vs. Bad Habits** — Build positive routines or track habits you're trying to break
+- **Special Tasks** — Add one-off daily tasks that do not repeat
 - **Reverse Logic for Bad Habits** — Bad habits are marked as "Resisted" (complete) by default and only "Slipped" if checked
 - **Score Ring** — Visual progress indicator with animated percentage
 - **Streak Counter** — Track consecutive perfect days
@@ -23,10 +24,11 @@
 
 ## 🔄 Habit Types
  
- Consistium supports two types of habits to help you design your ideal life:
+ Consistium supports three types of activities to help you design your ideal life:
  
 - **Good Habits (Build)** — Activities you want to perform. They are marked as "Done" when checked.
 - **Bad Habits (Break)** — Activities you want to avoid. These use reverse logic: they are marked as **"Resisted ✓"** (successful) by default. If you perform the habit, you check it to mark it as **"Slipped ✗"**.
+- **Special Tasks (One-time)** — Day-specific tasks that do not recur. These only show up on the day they are created and contribute to that day's score.
  
  ## 🚀 Getting Started
 
