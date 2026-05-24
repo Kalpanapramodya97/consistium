@@ -441,7 +441,28 @@ body {
 /* Quotes */
 .quotes-section { margin: 28px 0; }
 
+.quote-card-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.quote-arrow {
+  background: var(--bg-card); border: 1px solid var(--border);
+  color: var(--text-secondary); border-radius: 10px;
+  width: 36px; height: 36px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition); flex-shrink: 0;
+}
+
+.quote-arrow:hover {
+  background: var(--bg-card-hover); color: var(--text-primary);
+  border-color: var(--border-active);
+  transform: scale(1.05);
+}
+
 .quote-card {
+  flex: 1;
   padding: 24px; background: var(--bg-card);
   border: 1px solid var(--border); border-radius: var(--radius);
   position: relative;

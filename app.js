@@ -46,6 +46,7 @@
   let state = loadState();
   let currentDate = new Date();
   resetToMidnight(currentDate);
+  let currentQuoteIdx = -1;
 
   // ── DOM Elements ──
   const $ = (sel) => document.querySelector(sel);
@@ -75,6 +76,8 @@
     habitHint: $('#habitHint'),
     weeklyHeatmap: $('#weeklyHeatmap'),
     quoteText: $('#quoteText'),
+    prevQuote: $('#prevQuote'),
+    nextQuote: $('#nextQuote'),
     streakCount: $('#streakCount'),
     addHabitBtn: $('#addHabitBtn'),
     habitModal: $('#habitModal'),
@@ -447,9 +450,12 @@
     }
   }
 
-  function renderQuote() {
-    const idx = Math.floor(Math.random() * QUOTES.length);
-    dom.quoteText.textContent = QUOTES[idx].text;
+  function renderQuote(idx) {
+    if (idx === undefined) {
+      idx = Math.floor(Math.random() * QUOTES.length);
+    }
+    currentQuoteIdx = idx;
+    dom.quoteText.textContent = QUOTES[currentQuoteIdx].text;
   }
 
   function renderAll() {
@@ -662,7 +668,20 @@
     injectGradient();
     renderAll();
     renderQuote();
-    setInterval(renderQuote, 5 * 60 * 1000); // Change quote every 5 minutes
+    setInterval(() => renderQuote(), 5 * 60 * 1000); // Change quote every 5 minutes
+
+    // Quote navigation
+    dom.prevQuote.addEventListener('click', () => {
+      let nextIdx = currentQuoteIdx - 1;
+      if (nextIdx < 0) nextIdx = QUOTES.length - 1;
+      renderQuote(nextIdx);
+    });
+
+    dom.nextQuote.addEventListener('click', () => {
+      let nextIdx = currentQuoteIdx + 1;
+      if (nextIdx >= QUOTES.length) nextIdx = 0;
+      renderQuote(nextIdx);
+    });
 
     // Date navigation
     dom.prevDay.addEventListener('click', () => {
