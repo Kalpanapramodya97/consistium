@@ -26,6 +26,11 @@
     { text: "The task of breaking a bad habit is like uprooting a powerful oak within us.", author: "James Clear" },
     { text: "Goals are good for setting a direction, but systems are best for making progress.", author: "James Clear" },
     { text: "True behavior change is identity change.", author: "James Clear" },
+    { text: "Environment is the invisible hand that shapes human behavior.", author: "James Clear" },
+    { text: "Some people spend their entire lives waiting for the time to be right to make an improvement.", author: "James Clear" },
+    { text: "The ultimate form of intrinsic motivation is when a habit becomes part of your identity.", author: "James Clear" },
+    { text: "Professionals stick to the schedule; amateurs let life get in the way.", author: "James Clear" },
+    { text: "If you want better results, then forget about setting goals. Focus on your system instead.", author: "James Clear" },
   ];
 
   const DEFAULT_HABITS = [
@@ -657,6 +662,7 @@
     injectGradient();
     renderAll();
     renderQuote();
+    setInterval(renderQuote, 5 * 60 * 1000); // Change quote every 5 minutes
 
     // Date navigation
     dom.prevDay.addEventListener('click', () => {
