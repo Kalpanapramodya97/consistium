@@ -6,6 +6,15 @@
 (function () {
   'use strict';
 
+  // ── Initial Theme Load (prevent flash, default: light) ──
+  const savedTheme = localStorage.getItem('consistium_theme');
+  const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+    document.documentElement.classList.add('dark-theme');
+  } else {
+    document.documentElement.classList.remove('dark-theme');
+  }
+
   // ── Constants ──
   const STORAGE_KEY = 'consistium_data';
   const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -105,6 +114,7 @@
     saveHabitBtn: $('#saveHabitBtn'),
     deleteHabitBtn: $('#deleteHabitBtn'),
     emojiPicker: $('#emojiPicker'),
+    themeToggleBtn: $('#themeToggleBtn'),
     settingsBtn: $('#settingsBtn'),
     settingsModal: $('#settingsModal'),
     settingsCloseBtn: $('#settingsCloseBtn'),
@@ -741,6 +751,12 @@
         btn.classList.add('selected');
         dom.habitEmoji.value = btn.dataset.emoji;
       });
+    });
+
+    // Theme Toggle
+    dom.themeToggleBtn.addEventListener('click', () => {
+      const isDark = document.documentElement.classList.toggle('dark-theme');
+      localStorage.setItem('consistium_theme', isDark ? 'dark' : 'light');
     });
 
     // Settings
