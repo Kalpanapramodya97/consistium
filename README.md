@@ -2,7 +2,7 @@
 
 > *"You do not rise to the level of your goals. You fall to the level of your systems."* — James Clear
 
-**Consistium** is a premium, dark-themed daily habit tracker inspired by James Clear's *Atomic Habits*. Track your habits, build streaks, and become 1% better every day.
+**Consistium** is a premium daily habit tracker inspired by James Clear's *Atomic Habits*. Track your habits, build streaks, and become 1% better every day.
 
 ## ✨ Features
 
@@ -16,11 +16,14 @@
 - **Add/Edit/Delete Habits** — Full CRUD with emoji picker
 - **Date Navigation** — Review past days or plan ahead (← → arrow keys)
 - **Confetti Celebration** — Perfect day triggers confetti animation 🎉
-- **James Clear Quotes** — Rotating motivational quotes from Atomic Habits
+- **🌗 Light & Dark Theme** — Default light theme with a one-click dark mode toggle; automatically respects your system colour-scheme preference
+- **150+ Curated Quotes** — Motivational quotes from *Atomic Habits*, *Deep Work*, *Mindset*, and *Wild Courage*
+- **Quote Navigation** — Browse quotes manually with ← → arrows, or let them auto-rotate every 5 minutes
 - **Data Persistence** — All data saved in localStorage
 - **Import/Export** — Backup and restore your data as JSON
 - **Keyboard Shortcuts** — Arrow keys for navigation, Escape to close modals
 - **Responsive Design** — Works beautifully on mobile and desktop
+- **🐳 Docker Support** — One-command deployment with Docker Compose and Nginx
 
 ## 🔄 Habit Types
  
@@ -32,6 +35,8 @@
  
  ## 🚀 Getting Started
 
+### Option 1 — Static File
+
 Simply open `index.html` in any modern browser. No build tools, no dependencies, no server required.
 
 ```bash
@@ -42,6 +47,16 @@ git clone https://github.com/kalpanapramodya97/consistium.git
 start index.html   # Windows
 open index.html    # macOS
 ```
+
+### Option 2 — Docker
+
+Run with Docker Compose for a production-ready Nginx setup:
+
+```bash
+docker compose up -d
+```
+
+The app will be available at `http://localhost:8080`.
 
 ## 🎯 Default Habits
 
@@ -60,14 +75,17 @@ open index.html    # macOS
 - **CSS3** — Custom properties, animations, glassmorphism
 - **Vanilla JavaScript** — Zero dependencies, IIFE pattern
 - **localStorage** — Client-side persistence
+- **Docker + Nginx** — Containerised deployment
 
 ## 📸 Design Highlights
 
-- Dark mode with ambient floating orbs
+- Light & dark themes with ambient floating orbs
+- One-click theme toggle with system-preference detection
 - Animated score ring with gradient stroke
 - Micro-interactions on hover and completion
 - Confetti celebration on perfect days
 - Weekly heatmap with intensity levels
+- 150+ quotes across 4 books with fade-transition navigation
 - Premium typography with Inter & JetBrains Mono
 
 ## 📄 License
