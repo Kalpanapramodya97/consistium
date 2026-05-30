@@ -797,4 +797,444 @@
   } else {
     init();
   }
+
+  // ============================================
+  // AI HABIT ADVISOR MODULE
+  // ============================================
+  
+  const AI_KNOWLEDGE = {
+    analyze: [
+      (ctx) => {
+        const { total, done, pct, goodCount, badCount, streak, goodHabits, badHabits } = ctx;
+        let analysis = `<strong>📊 Your Habit Dashboard</strong><br><br>`;
+        analysis += `You're tracking <strong>${total} habit${total !== 1 ? 's' : ''}</strong> (${goodCount} positive, ${badCount} to break).<br><br>`;
+        
+        if (pct === 100) {
+          analysis += `🏆 <strong>Perfect score today!</strong> You've completed everything. You're living proof that consistency beats motivation.<br><br>`;
+          analysis += `<div class="advice-highlight">💎 Pro tip: Don't forget to celebrate small wins — it rewires your brain to associate habits with positive feelings.</div>`;
+        } else if (pct >= 70) {
+          analysis += `⚡ <strong>${pct}% completion</strong> — solid progress! You're in the sweet spot. `;
+          const remaining = total - done;
+          analysis += `Just <strong>${remaining} more</strong> to go for a perfect day.<br><br>`;
+          analysis += `<div class="advice-highlight">🎯 Focus on the next single habit. Don't think about all ${remaining} — just the very next one.</div>`;
+        } else if (pct >= 40) {
+          analysis += `🔄 <strong>${pct}% done</strong> — you're getting there. Remember: "You don't have to be extreme, just consistent."<br><br>`;
+          analysis += `<div class="advice-highlight">💡 Try the 2-minute rule: Scale each remaining habit down to just 2 minutes. Start tiny, finish strong.</div>`;
+        } else if (pct > 0) {
+          analysis += `🌱 <strong>${pct}% so far</strong> — every journey starts with a single step, and you've taken yours.<br><br>`;
+          analysis += `<div class="advice-highlight">🔑 Stack your habits: Tie each new habit to one you already do. "After I [existing habit], I will [new habit]."</div>`;
+        } else {
+          analysis += `📋 <strong>Fresh start today!</strong> No habits completed yet — but that's okay. The day isn't over.<br><br>`;
+          analysis += `<div class="advice-highlight">⚡ Quick win strategy: Pick the easiest habit and do it RIGHT NOW. Momentum is real.</div>`;
+        }
+
+        if (streak > 0) {
+          analysis += `<br>🔥 You're on a <strong>${streak}-day streak</strong>! `;
+          if (streak >= 21) analysis += `That's incredible — you're past the habit formation threshold!`;
+          else if (streak >= 7) analysis += `One full week of consistency. Your neural pathways are strengthening.`;
+          else analysis += `Keep it going — the first week is the hardest.`;
+        }
+        
+        return analysis;
+      }
+    ],
+    suggest: [
+      (ctx) => {
+        const categories = [
+          { title: '🧠 Mental Wellness', habits: ['Meditate for 5 minutes', 'Journal 3 gratitudes', 'Digital detox for 1 hour', 'Practice deep breathing'] },
+          { title: '💪 Physical Health', habits: ['10-minute morning stretch', 'Drink 8 glasses of water', 'Walk 10,000 steps', 'Sleep by 10:30 PM'] },
+          { title: '📚 Growth & Learning', habits: ['Read 20 pages', 'Learn one new word', 'Watch a TED talk', 'Practice a skill for 15 min'] },
+          { title: '🤝 Relationships', habits: ['Text a friend', 'Give a genuine compliment', 'Call a family member', 'Practice active listening'] },
+          { title: '💼 Productivity', habits: ['Plan tomorrow tonight', 'Complete the hardest task first', 'Take a break every 90 min', 'Review weekly goals'] }
+        ];
+
+        const existing = ctx.habitNames.map(n => n.toLowerCase());
+        let response = `<strong>💡 Personalized Habit Suggestions</strong><br><br>`;
+        response += `Based on your current ${ctx.total} habits, here are categories to consider:<br><br>`;
+
+        const selectedCats = categories.sort(() => Math.random() - 0.5).slice(0, 3);
+        selectedCats.forEach(cat => {
+          const newOnes = cat.habits.filter(h => !existing.some(e => e.includes(h.toLowerCase().slice(0, 8))));
+          const picks = newOnes.sort(() => Math.random() - 0.5).slice(0, 2);
+          if (picks.length) {
+            response += `<strong>${cat.title}</strong><ul>`;
+            picks.forEach(p => response += `<li>${p}</li>`);
+            response += `</ul>`;
+          }
+        });
+
+        response += `<div class="advice-highlight">🧪 The <strong>Atomic Habits</strong> rule: Make it obvious, attractive, easy, and satisfying. Start with just 2 minutes of any new habit.</div>`;
+        return response;
+      }
+    ],
+    motivation: [
+      () => {
+        const messages = [
+          `<strong>🔥 You Are Unstoppable</strong><br><br>Remember: <em>"The secret of getting ahead is getting started."</em> — Mark Twain<br><br>Every single habit you complete is a vote for the person you want to become. Not a big, dramatic vote — a tiny, quiet one. But those tiny votes compound.<br><br><div class="advice-highlight">🧮 Math of 1% better daily:<br>1.01^365 = <strong>37.78x improvement</strong> in one year!</div>`,
+          
+          `<strong>💪 Your Future Self is Watching</strong><br><br>Think about who you'll be in 6 months if you keep showing up every day. That person is <em>grateful</em> you started today.<br><br><em>"We are what we repeatedly do. Excellence, then, is not an act, but a habit."</em> — Aristotle<br><br><div class="advice-highlight">🎯 Don't break the chain. Every day you show up, the chain gets stronger. One missed day is a mistake. Two missed days is the start of a new (bad) habit.</div>`,
+          
+          `<strong>🌟 Progress, Not Perfection</strong><br><br>You don't need a perfect day. You need a <strong>consistent</strong> one. Even completing 50% of your habits puts you ahead of 90% of people who set no intentions at all.<br><br><em>"The man who moves a mountain begins by carrying away small stones."</em> — Confucius<br><br><div class="advice-highlight">⚡ Motivation is what gets you started. <strong>Habit</strong> is what keeps you going. Trust the system, not the feeling.</div>`,
+          
+          `<strong>🚀 The Compound Effect</strong><br><br>Tiny changes, remarkable results. That's not just a tagline — it's neuroscience.<br><br>Every time you repeat a habit, you're physically <strong>rewiring your brain</strong>. Myelin wraps around neural pathways, making them faster and more automatic.<br><br><div class="advice-highlight">🧠 After ~66 days of consistent practice, a habit becomes nearly automatic. You're building neural infrastructure right now.</div>`
+        ];
+        return messages[Math.floor(Math.random() * messages.length)];
+      }
+    ],
+    streak: [
+      (ctx) => {
+        let response = `<strong>📈 Streak Strategy Guide</strong><br><br>`;
+        
+        if (ctx.streak === 0) {
+          response += `You're starting fresh — perfect. Here's how to build an unbreakable streak:<br><br>`;
+          response += `<ul>`;
+          response += `<li><strong>Never miss twice.</strong> One bad day doesn't break a habit. Two does.</li>`;
+          response += `<li><strong>Reduce scope, not schedule.</strong> Do less on hard days, but still show up.</li>`;
+          response += `<li><strong>Track visibly.</strong> Use this app daily — what gets measured gets managed.</li>`;
+          response += `</ul><br>`;
+        } else if (ctx.streak < 7) {
+          response += `🔥 <strong>${ctx.streak}-day streak</strong> — you're in the critical first week!<br><br>`;
+          response += `Research shows <strong>Days 3-7 are the hardest</strong>. The novelty wears off but the habit hasn't automated yet. Push through this valley!<br><br>`;
+          response += `<ul>`;
+          response += `<li><strong>Reward yourself</strong> after each completed day</li>`;
+          response += `<li><strong>Environment design:</strong> Remove friction for good habits, add friction for bad ones</li>`;
+          response += `<li><strong>Identity shift:</strong> Say "I'm someone who..." instead of "I'm trying to..."</li>`;
+          response += `</ul>`;
+        } else if (ctx.streak < 21) {
+          response += `🔥🔥 <strong>${ctx.streak}-day streak</strong> — you're building serious momentum!<br><br>`;
+          response += `You're approaching the <strong>21-day milestone</strong> where many habits begin to feel more natural.<br><br>`;
+          response += `<div class="advice-highlight">🎯 Pro tip: Now is the time to slightly increase difficulty. If you read 10 pages, try 12. The "progressive overload" principle works for habits too.</div>`;
+        } else {
+          response += `🔥🔥🔥 <strong>${ctx.streak}-day streak</strong> — you're a habit machine!<br><br>`;
+          response += `At this point, these habits are becoming part of your <strong>identity</strong>. You're no longer just doing them — you ARE someone who does them.<br><br>`;
+          response += `<div class="advice-highlight">🏆 Challenge: Consider adding one new micro-habit to your stack. You've proven you can be consistent. Time to level up.</div>`;
+        }
+        
+        return response;
+      }
+    ],
+    science: [
+      () => {
+        const facts = [
+          `<strong>🔬 The Science of Habit Formation</strong><br><br>Every habit follows the <strong>Habit Loop</strong> (from Charles Duhigg's research):<br><br><ul><li><strong>Cue:</strong> The trigger that initiates the behavior</li><li><strong>Craving:</strong> The motivational force behind it</li><li><strong>Response:</strong> The actual behavior/habit</li><li><strong>Reward:</strong> The satisfying outcome</li></ul><br><div class="advice-highlight">🧪 To build a habit: make the cue obvious, the craving attractive, the response easy, and the reward satisfying.</div>`,
+          
+          `<strong>🧠 Neuroplasticity & Habits</strong><br><br>When you repeat a behavior, your brain creates <strong>stronger neural connections</strong> through a process called <em>long-term potentiation</em>.<br><br>Think of it like a path through a forest — the more you walk it, the more defined it becomes. Eventually, it becomes the default route.<br><br><div class="advice-highlight">📊 Research by Phillippa Lally (2009) found it takes an average of <strong>66 days</strong> to form a new habit — not 21 days as commonly believed. Range: 18–254 days depending on complexity.</div>`,
+          
+          `<strong>⚡ Dopamine & The Reward System</strong><br><br>Here's a fascinating finding: dopamine rises <em>before</em> the reward, during <strong>anticipation</strong>. This is why habits that feel rewarding in the moment are easiest to build.<br><br><ul><li><strong>Temptation bundling:</strong> Pair a habit you need to do with one you want to do</li><li><strong>Immediate rewards:</strong> Add a small pleasure after completing a hard habit</li><li><strong>Tracking itself is rewarding:</strong> The visual progress in this app triggers satisfaction</li></ul><br><div class="advice-highlight">🎯 The brain prioritizes immediate rewards. Make good habits immediately satisfying and bad habits immediately unsatisfying.</div>`
+        ];
+        return facts[Math.floor(Math.random() * facts.length)];
+      }
+    ],
+    morning: [
+      () => {
+        const routines = [
+          `<strong>🌅 The Miracle Morning Framework</strong><br><br>Based on Hal Elrod's SAVERS method, a powerful morning routine includes:<br><br><ul><li><strong>S</strong>ilence — 5 min meditation or deep breathing</li><li><strong>A</strong>ffirmations — Repeat your identity-based goals</li><li><strong>V</strong>isualization — Picture your ideal day</li><li><strong>E</strong>xercise — 10 min movement (even stretching counts)</li><li><strong>R</strong>eading — 10 pages of a growth book</li><li><strong>S</strong>cribing — Journal key thoughts or gratitudes</li></ul><br><div class="advice-highlight">⏰ Start with a <strong>10-minute version</strong>: 2 min silence + 2 min affirmations + 2 min visualization + 2 min exercise + 2 min reading. Scale up over time.</div>`,
+          
+          `<strong>☀️ Science-Backed Morning Wins</strong><br><br>Research shows these morning actions set you up for the best day possible:<br><br><ul><li><strong>Sunlight within 30 min</strong> of waking — resets your circadian rhythm</li><li><strong>Cold water on face</strong> — activates the vagus nerve, boosts alertness</li><li><strong>No phone for first 30 min</strong> — protects your dopamine baseline</li><li><strong>Protein-rich breakfast</strong> — stabilizes blood sugar and focus</li><li><strong>Make your bed</strong> — first small win creates momentum</li></ul><br><div class="advice-highlight">🧠 Andrew Huberman's tip: Get 10 min of morning sunlight to set your master clock. This single habit improves sleep, mood, and energy.</div>`
+        ];
+        return routines[Math.floor(Math.random() * routines.length)];
+      }
+    ],
+    breaking: [
+      (ctx) => {
+        let response = `<strong>🚫 Breaking Bad Habits — The Inversion Strategy</strong><br><br>`;
+        
+        if (ctx.badCount > 0) {
+          response += `You're tracking <strong>${ctx.badCount} bad habit${ctx.badCount > 1 ? 's' : ''}</strong> to break. Here's how to make them disappear:<br><br>`;
+        }
+        
+        response += `James Clear's <strong>Inversion of the 4 Laws</strong>:<br><br>`;
+        response += `<ul>`;
+        response += `<li><strong>Make it invisible:</strong> Remove cues from your environment. If you snack too much, don't keep snacks visible.</li>`;
+        response += `<li><strong>Make it unattractive:</strong> Reframe the habit. Instead of "I can't" say "I don't." ("I don't doom scroll" vs "I can't doom scroll")</li>`;
+        response += `<li><strong>Make it difficult:</strong> Add friction. Log out of social media after each use. Use website blockers.</li>`;
+        response += `<li><strong>Make it unsatisfying:</strong> Create accountability. Tell someone about your goal. Use a habit contract.</li>`;
+        response += `</ul><br>`;
+        response += `<div class="advice-highlight">🔑 The key insight: You don't eliminate a bad habit — you <strong>replace</strong> it. Find a healthier behavior that delivers a similar reward.</div>`;
+        
+        return response;
+      }
+    ],
+    stacking: [
+      (ctx) => {
+        let response = `<strong>🔗 Habit Stacking — The Ultimate Strategy</strong><br><br>`;
+        response += `The formula: <em>"After I [CURRENT HABIT], I will [NEW HABIT]."</em><br><br>`;
+        
+        if (ctx.goodHabits.length >= 2) {
+          response += `Here's a custom stack based on your habits:<br><br>`;
+          const shuffled = [...ctx.goodHabits].sort(() => Math.random() - 0.5);
+          const stackSize = Math.min(shuffled.length, 4);
+          response += `<div class="advice-highlight">`;
+          for (let i = 0; i < stackSize; i++) {
+            if (i === 0) {
+              response += `☀️ Wake up → <strong>${shuffled[i].emoji} ${shuffled[i].name}</strong><br>`;
+            } else {
+              response += `↓ After that → <strong>${shuffled[i].emoji} ${shuffled[i].name}</strong><br>`;
+            }
+          }
+          response += `</div><br>`;
+        }
+        
+        response += `<strong>Why it works:</strong><br>`;
+        response += `<ul>`;
+        response += `<li>Each completed habit becomes the <strong>cue</strong> for the next</li>`;
+        response += `<li>Creates a <strong>chain of momentum</strong> — each success fuels the next</li>`;
+        response += `<li>Reduces decision fatigue — you don't think "should I?", you just follow the sequence</li>`;
+        response += `<li>Leverages <strong>implementation intentions</strong> (specific when/where plans), which research shows doubles success rates</li>`;
+        response += `</ul>`;
+        
+        return response;
+      }
+    ]
+  };
+
+  const FREETEXT_RESPONSES = [
+    { keywords: ['procrastinat', 'lazy', 'can\'t start', 'putting off', 'delaying'], response: () => `<strong>⏳ Beating Procrastination</strong><br><br>Procrastination isn't a time problem — it's an <strong>emotion regulation</strong> problem. You're avoiding discomfort, not avoiding the task.<br><br><ul><li><strong>The 2-Minute Rule:</strong> If it takes less than 2 minutes, do it now. If it takes more, start with just 2 minutes.</li><li><strong>Temptation bundling:</strong> Pair the dreaded task with something you enjoy</li><li><strong>Implementation intention:</strong> "I will [TASK] at [TIME] in [LOCATION]"</li><li><strong>Eat the frog:</strong> Do the hardest thing first when willpower is highest</li></ul><br><div class="advice-highlight">🧠 Your brain overestimates the pain of starting. Studies show that once you begin, the perceived difficulty drops by 50%.</div>` },
+    { keywords: ['sleep', 'insomnia', 'tired', 'rest', 'bedtime', 'wake up'], response: () => `<strong>😴 Sleep Optimization Habits</strong><br><br>Sleep is the foundation of all other habits. Here's the science-backed protocol:<br><br><ul><li><strong>Consistent wake time</strong> — more important than bedtime</li><li><strong>No screens 1 hour before bed</strong> — blue light suppresses melatonin by 50%</li><li><strong>Cool room (65-68°F / 18-20°C)</strong> — core body temp drop triggers sleep</li><li><strong>Sunlight within 30 min of waking</strong> — sets circadian rhythm</li><li><strong>No caffeine after 2 PM</strong> — half-life is 5-7 hours</li></ul><br><div class="advice-highlight">📊 Research: Every hour of sleep before midnight is worth 2 hours after. Aim for 7-9 hours consistently.</div>` },
+    { keywords: ['exercise', 'workout', 'gym', 'fitness', 'run', 'walk'], response: () => `<strong>🏃 Exercise Habit Tips</strong><br><br>The best exercise habit is one you'll actually do. Here's how to make it stick:<br><br><ul><li><strong>Start absurdly small:</strong> 5 pushups or a 10-minute walk</li><li><strong>Lay out clothes the night before</strong> — reduce morning friction</li><li><strong>Track something simple:</strong> Just "did I move today?"</li><li><strong>Find a workout buddy</strong> — social accountability increases adherence by 65%</li><li><strong>Anchor it:</strong> "After my morning coffee, I stretch for 5 minutes"</li></ul><br><div class="advice-highlight">⚡ The minimum effective dose: 150 min/week of moderate activity or 75 min/week of vigorous activity. That's just ~22 min/day!</div>` },
+    { keywords: ['read', 'book', 'learning', 'study', 'learn'], response: () => `<strong>📚 Building a Reading Habit</strong><br><br><ul><li><strong>Start with 2 pages</strong>, not a chapter. Lower the bar.</li><li><strong>Replace one scroll session</strong> with reading — same dopamine, better content</li><li><strong>Keep a book visible</strong> everywhere — nightstand, desk, bag</li><li><strong>Read what you enjoy</strong> — don't force "important" books. Fun reads build the habit.</li><li><strong>Audiobooks count!</strong> Listen during commute, walks, or chores</li></ul><br><div class="advice-highlight">📖 Reading 20 pages/day = ~30 books/year. That puts you in the top 5% of readers globally.</div>` },
+    { keywords: ['meditat', 'mindful', 'calm', 'stress', 'anxi', 'relax'], response: () => `<strong>🧘 Meditation & Mindfulness</strong><br><br><ul><li><strong>Start with 1 minute.</strong> Set a timer. Just breathe and notice thoughts.</li><li><strong>Use guided apps</strong> initially — structure helps beginners</li><li><strong>Same time, same place</strong> — consistency matters more than duration</li><li><strong>Don't judge "bad" sessions</strong> — noticing distraction IS the practice</li><li><strong>Body scan technique:</strong> Slowly focus attention from toes to head</li></ul><br><div class="advice-highlight">🧠 8 weeks of consistent meditation physically increases gray matter in areas for learning, memory, and emotional regulation (Harvard study, 2011).</div>` },
+    { keywords: ['water', 'drink', 'hydrat'], response: () => `<strong>💧 Hydration Habits</strong><br><br><ul><li><strong>Start each morning</strong> with a full glass of water</li><li><strong>Use a marked water bottle</strong> — visual cues work</li><li><strong>Set hourly reminders</strong> until it becomes automatic</li><li><strong>Flavor it:</strong> Lemon, cucumber, or fruit infusions reduce resistance</li><li><strong>Link it:</strong> "Every time I check my phone, I drink water"</li></ul><br><div class="advice-highlight">📊 Even 2% dehydration reduces cognitive performance by 10-15%. Your brain is 75% water.</div>` },
+    { keywords: ['focus', 'distract', 'concentration', 'attention', 'phone', 'social media', 'screen'], response: () => `<strong>🎯 Deep Focus Habits</strong><br><br><ul><li><strong>Time blocking:</strong> Dedicate specific hours to deep work</li><li><strong>Phone in another room</strong> — even a visible phone reduces IQ by 10 points (Texas study)</li><li><strong>The Pomodoro Technique:</strong> 25 min work → 5 min break → repeat</li><li><strong>Single-tab browsing</strong> — each open tab costs 10% of your attention</li><li><strong>Batch notifications:</strong> Check messages at set times, not on demand</li></ul><br><div class="advice-highlight">🧠 It takes an average of <strong>23 minutes</strong> to regain deep focus after an interruption (UC Irvine research). Protect your attention fiercely.</div>` },
+    { keywords: ['goal', 'plan', 'future', 'success', 'achieve'], response: () => `<strong>🎯 Goal-Setting Meets Habits</strong><br><br>Goals set direction. <strong>Systems</strong> drive progress.<br><br><ul><li><strong>Identity-based goals:</strong> "I want to become a runner" vs "I want to run a marathon"</li><li><strong>Process over outcome:</strong> Focus on "Did I show up?" not "Did I hit the target?"</li><li><strong>Review weekly:</strong> Sunday evening is perfect for a habit review</li><li><strong>Measure lead indicators:</strong> Track habits (inputs), not just results (outputs)</li></ul><br><div class="advice-highlight">📈 "You do not rise to the level of your goals. You fall to the level of your systems." — James Clear</div>` }
+  ];
+
+  function getAIContext() {
+    const key = dateKey(currentDate);
+    const completions = state.completions[key] || {};
+    const tasks = state.tasks[key] || [];
+    const goodHabits = state.habits.filter(h => h.type !== 'bad');
+    const badHabits = state.habits.filter(h => h.type === 'bad');
+    const total = state.habits.length + tasks.length;
+    let done = state.habits.filter(h => getHabitScore(h, completions)).length;
+    done += tasks.filter(t => t.isCompleted).length;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    // Calculate streak
+    let streak = 0;
+    const today = new Date();
+    resetToMidnight(today);
+    const checkDate = new Date(today);
+    const todayKey = dateKey(today);
+    const todayCompletions = state.completions[todayKey] || {};
+    const todayTasks = state.tasks[todayKey] || [];
+    const todayDone = state.habits.every(h => getHabitScore(h, todayCompletions)) &&
+                      (todayTasks.length === 0 || todayTasks.every(t => t.isCompleted));
+    if (!todayDone) checkDate.setDate(checkDate.getDate() - 1);
+    while (true) {
+      const k = dateKey(checkDate);
+      const c = state.completions[k] || {};
+      const t = state.tasks[k] || [];
+      const allDone = state.habits.length > 0 && state.habits.every(h => getHabitScore(h, c)) &&
+                      (t.length === 0 || t.every(x => x.isCompleted));
+      if (!allDone) break;
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+    if (todayDone && state.habits.length > 0) streak++;
+
+    return {
+      total, done, pct, streak,
+      goodCount: goodHabits.length,
+      badCount: badHabits.length,
+      goodHabits, badHabits,
+      habitNames: state.habits.map(h => h.name),
+      tasks
+    };
+  }
+
+  function initAIAdvisor() {
+    const messagesEl = document.getElementById('aiMessages');
+    const inputEl = document.getElementById('aiInput');
+    const sendBtn = document.getElementById('aiSendBtn');
+    const panel = document.getElementById('aiAdvisorPanel');
+    const closeBtn = document.getElementById('aiCloseBtn');
+    const fab = document.getElementById('aiFab');
+    const toggleBtn = document.getElementById('aiAdvisorToggle');
+    const chips = document.querySelectorAll('.ai-chip');
+
+    if (!messagesEl || !inputEl) return;
+
+    // Create backdrop for mobile
+    const backdrop = document.createElement('div');
+    backdrop.className = 'ai-backdrop';
+    backdrop.id = 'aiBackdrop';
+    document.body.appendChild(backdrop);
+
+    let isTyping = false;
+
+    function addMessage(content, isUser = false) {
+      const msg = document.createElement('div');
+      msg.className = `ai-msg${isUser ? ' user-msg' : ''}`;
+      msg.innerHTML = `
+        <div class="ai-msg-avatar">${isUser ? '👤' : '🧠'}</div>
+        <div class="ai-msg-bubble">${content}</div>
+      `;
+      messagesEl.appendChild(msg);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function showTyping() {
+      isTyping = true;
+      const typing = document.createElement('div');
+      typing.className = 'ai-msg';
+      typing.id = 'aiTypingIndicator';
+      typing.innerHTML = `
+        <div class="ai-msg-avatar">🧠</div>
+        <div class="ai-msg-bubble">
+          <div class="ai-typing">
+            <div class="ai-typing-dot"></div>
+            <div class="ai-typing-dot"></div>
+            <div class="ai-typing-dot"></div>
+          </div>
+        </div>
+      `;
+      messagesEl.appendChild(typing);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      // Update status
+      const statusEl = document.getElementById('aiStatus');
+      if (statusEl) statusEl.innerHTML = '<span class="ai-status-dot" style="background:var(--warning)"></span> Thinking...';
+    }
+
+    function hideTyping() {
+      isTyping = false;
+      const typing = document.getElementById('aiTypingIndicator');
+      if (typing) typing.remove();
+
+      const statusEl = document.getElementById('aiStatus');
+      if (statusEl) statusEl.innerHTML = '<span class="ai-status-dot"></span> Ready to help';
+    }
+
+    function respondWithDelay(content, delay = 1200) {
+      showTyping();
+      setTimeout(() => {
+        hideTyping();
+        addMessage(content);
+      }, delay + Math.random() * 800);
+    }
+
+    function handleAction(action) {
+      const ctx = getAIContext();
+      const handlers = AI_KNOWLEDGE[action];
+      if (handlers && handlers.length > 0) {
+        const handler = handlers[Math.floor(Math.random() * handlers.length)];
+        const response = typeof handler === 'function' ? handler(ctx) : handler;
+        respondWithDelay(response);
+      }
+    }
+
+    function handleFreeText(text) {
+      const lower = text.toLowerCase();
+      
+      // Check free-text knowledge base
+      for (const entry of FREETEXT_RESPONSES) {
+        if (entry.keywords.some(kw => lower.includes(kw))) {
+          respondWithDelay(entry.response());
+          return;
+        }
+      }
+
+      // Check action keywords
+      const actionMap = {
+        'analyze': ['analyze', 'analysis', 'how am i doing', 'progress', 'score', 'dashboard', 'status', 'report'],
+        'suggest': ['suggest', 'recommend', 'new habit', 'what should', 'ideas', 'add'],
+        'motivation': ['motivat', 'inspire', 'why should', 'give up', 'hard', 'difficult', 'encourage'],
+        'streak': ['streak', 'consistent', 'consistency', 'keep going', 'maintain'],
+        'science': ['science', 'research', 'how do habits', 'brain', 'neuroscience', 'psychology'],
+        'morning': ['morning', 'routine', 'wake up', 'start the day', 'sunrise'],
+        'breaking': ['break', 'bad habit', 'stop', 'quit', 'avoid', 'temptation'],
+        'stacking': ['stack', 'chain', 'sequence', 'link', 'combine', 'together']
+      };
+
+      for (const [action, keywords] of Object.entries(actionMap)) {
+        if (keywords.some(kw => lower.includes(kw))) {
+          handleAction(action);
+          return;
+        }
+      }
+
+      // Generic response with helpful direction
+      const genericResponses = [
+        `Great question! While I think about that, here's something actionable:<br><br><div class="advice-highlight">💡 Try the <strong>"Two-Minute Rule"</strong> — any habit can be scaled down to a 2-minute version. "Read a book" becomes "Read one page." Start tiny, build momentum.</div><br>Try clicking one of the quick action chips below for specific advice!`,
+        `That's an interesting thought! Let me share something relevant:<br><br><div class="advice-highlight">🔑 <strong>Identity-based habits</strong> are the most powerful. Instead of "I want to read more," say "I am a reader." Every action is a vote for the type of person you wish to become.</div><br>Use the suggestion chips below for personalized advice about your habits!`,
+        `I appreciate you thinking about your habits! Here's a powerful insight:<br><br><div class="advice-highlight">🧪 <strong>Environment design</strong> beats willpower every time. Make good habits easy (put the book on your pillow) and bad habits hard (delete the app, don't just log out).</div><br>Try asking me about specific topics like "morning routine", "breaking bad habits", or "motivation"!`
+      ];
+      respondWithDelay(genericResponses[Math.floor(Math.random() * genericResponses.length)]);
+    }
+
+    function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text || isTyping) return;
+      
+      addMessage(text, true);
+      inputEl.value = '';
+      handleFreeText(text);
+    }
+
+    // Toggle panel (mobile)
+    function openPanel() {
+      panel.classList.add('open');
+      backdrop.classList.add('show');
+      fab.classList.add('hidden');
+      if (toggleBtn) toggleBtn.classList.add('active');
+    }
+
+    function closePanel() {
+      panel.classList.remove('open');
+      backdrop.classList.remove('show');
+      fab.classList.remove('hidden');
+      if (toggleBtn) toggleBtn.classList.remove('active');
+    }
+
+    // Event listeners
+    sendBtn.addEventListener('click', sendMessage);
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        const action = chip.dataset.action;
+        addMessage(chip.textContent.trim(), true);
+        handleAction(action);
+      });
+    });
+
+    if (closeBtn) closeBtn.addEventListener('click', closePanel);
+    if (fab) fab.addEventListener('click', openPanel);
+    if (backdrop) backdrop.addEventListener('click', closePanel);
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const isMobile = window.innerWidth <= 960;
+        if (isMobile) {
+          if (panel.classList.contains('open')) {
+            closePanel();
+          } else {
+            openPanel();
+          }
+        }
+      });
+    }
+
+    // Welcome message
+    setTimeout(() => {
+      const ctx = getAIContext();
+      let welcome = `Hey there! 👋 I'm your <strong>AI Habit Coach</strong>.<br><br>`;
+      welcome += `I can see you're tracking <strong>${ctx.total} habit${ctx.total !== 1 ? 's' : ''}</strong>`;
+      if (ctx.streak > 0) welcome += ` with a 🔥 <strong>${ctx.streak}-day streak</strong>`;
+      welcome += `.<br><br>`;
+      welcome += `Ask me anything about building better habits, or try one of the quick actions below!`;
+      addMessage(welcome);
+    }, 600);
+  }
+
+  // Boot AI Advisor after main app
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAIAdvisor);
+  } else {
+    // Small delay to ensure DOM is ready
+    setTimeout(initAIAdvisor, 100);
+  }
+
 })();
