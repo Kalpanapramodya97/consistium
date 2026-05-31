@@ -1,5 +1,8 @@
 # ◆ Consistium — Atomic Habit Tracker
 
+<img width="1657" height="662" alt="image" src="https://github.com/user-attachments/assets/8d9306da-5127-4a41-97e4-404d52740284" />
+
+
 > *"You do not rise to the level of your goals. You fall to the level of your systems."* — James Clear
 
 **Consistium** is a premium daily habit tracker inspired by James Clear's *Atomic Habits*. Track your habits, build streaks, and become 1% better every day.
