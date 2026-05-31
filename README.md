@@ -33,30 +33,41 @@
 - **Bad Habits (Break)** — Activities you want to avoid. These use reverse logic: they are marked as **"Resisted ✓"** (successful) by default. If you perform the habit, you check it to mark it as **"Slipped ✗"**.
 - **Special Tasks (One-time)** — Day-specific tasks that do not recur. These only show up on the day they are created and contribute to that day's score.
  
- ## 🚀 Getting Started
+## 🚀 Getting Started
 
-### Option 1 — Static File
+### Option 1 — Static File (No Installation)
 
 Simply open `index.html` in any modern browser. No build tools, no dependencies, no server required.
 
 ```bash
 # Clone the repo
-git clone https://github.com/kalpanapramodya97/consistium.git
+git clone https://github.com/Kalpanapramodya97/consistium.git
+cd consistium
 
 # Open in browser
 start index.html   # Windows
 open index.html    # macOS
 ```
 
-### Option 2 — Docker
+### Option 2 — Docker Compose (Local Build)
 
-Run with Docker Compose for a production-ready Nginx setup:
+Run with Docker Compose for a production-ready Nginx setup. This builds the image locally from the source code:
 
 ```bash
 docker compose up -d
 ```
 
-The app will be available at `http://localhost:8080`.
+The app will be available at `http://localhost:3000`.
+
+### Option 3 — Pre-built Docker Image (GHCR)
+
+You can also run the pre-built image directly from our GitHub Container Registry without needing to build it yourself or clone the repository:
+
+```bash
+docker run -d -p 3000:80 --name consistium-app ghcr.io/kalpanapramodya97/consistium/habit-tracker:latest
+```
+
+The app will be available at `http://localhost:3000`.
 
 ## 🎯 Default Habits
 
