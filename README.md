@@ -61,11 +61,13 @@ The app will be available at `http://localhost:3000`.
 
 ### Option 3 — Pre-built Docker Image (GHCR)
 
-You can also run the pre-built image directly from our GitHub Container Registry without needing to build it yourself or clone the repository:
+You can run the pre-built image directly from our GitHub Container Registry. You don't need to clone the repository, install dependencies, or even explicitly pull the image. Docker handles everything automatically:
 
 ```bash
-docker run -d -p 3000:80 --name consistium-app ghcr.io/kalpanapramodya97/consistium/habit-tracker:latest
+docker run -d -p 3000:80 --name consistium-app ghcr.io/Kalpanapramodya97/consistium/habit-tracker:latest
 ```
+
+*(Note: If the image isn't already on your machine, Docker will automatically download it from the registry and start the server.)*
 
 The app will be available at `http://localhost:3000`.
 
