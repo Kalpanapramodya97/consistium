@@ -13,6 +13,10 @@
 
 **Consistium** is a premium daily habit tracker inspired by James Clear's *Atomic Habits*. Track your habits, build streaks, and become 1% better every day.
 
+<p align="center">
+  <img src="assets/screenshot.png" alt="Consistium App Preview" width="800"/>
+</p>
+
 ## ✨ Features
 
 - **Daily Habit Tracking** — Tap to mark habits complete with satisfying animations
@@ -33,6 +37,7 @@
 - **Keyboard Shortcuts** — Arrow keys for navigation, Escape to close modals
 - **Responsive Design** — Works beautifully on mobile and desktop
 - **🐳 Docker Support** — One-command deployment with Docker Compose and Nginx
+- **📊 Observability** — Built-in Prometheus & Grafana stack for monitoring Nginx metrics
 
 ## 🔄 Habit Types
  
@@ -98,6 +103,7 @@ The app will be available at `http://localhost:3000`.
 - **Vanilla JavaScript** — Zero dependencies, IIFE pattern
 - **localStorage** — Client-side persistence
 - **Docker + Nginx** — Containerised deployment
+- **Prometheus & Grafana** — Full observability stack with metrics and dashboards via Docker Compose
 
 ## 📸 Design Highlights
 
