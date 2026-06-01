@@ -1,13 +1,5 @@
 # ◆ Consistium — Atomic Habit Tracker
 
-<img width="1657" height="662" alt="image" src="https://github.com/user-attachments/assets/8d9306da-5127-4a41-97e4-404d52740284" />
-
-<img width="1902" height="926" alt="image" src="https://github.com/user-attachments/assets/1972a363-efeb-4d88-97cc-74ec75ec7bce" />
-
-<img width="1915" height="623" alt="image" src="https://github.com/user-attachments/assets/8a6b89bd-867b-456d-a120-dbc22faa3b25" />
-
-
-
 
 > *"You do not rise to the level of your goals. You fall to the level of your systems."* — James Clear
 
@@ -115,6 +107,22 @@ The app will be available at `http://localhost:3000`.
 - Weekly heatmap with intensity levels
 - 150+ quotes across 4 books with fade-transition navigation
 - Premium typography with Inter & JetBrains Mono
+
+## 🖼️ Gallery
+
+### App & Features
+<p align="center">
+  <img width="800" alt="App Dashboard" src="https://github.com/user-attachments/assets/8d9306da-5127-4a41-97e4-404d52740284" />
+</p>
+
+### DevOps & Observability
+<p align="center">
+  <img width="800" alt="Prometheus Metrics" src="https://github.com/user-attachments/assets/1972a363-efeb-4d88-97cc-74ec75ec7bce" />
+</p>
+
+<p align="center">
+  <img width="800" alt="Grafana Dashboard" src="https://github.com/user-attachments/assets/8a6b89bd-867b-456d-a120-dbc22faa3b25" />
+</p>
 
 ## 📄 License
 
