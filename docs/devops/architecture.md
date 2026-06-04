@@ -1,6 +1,6 @@
 # System Architecture
 
-Consistium is a lightweight, statically-served habit tracking application built with HTML, CSS, and JavaScript. The application is containerized using Docker and served through Nginx, with a full observability stack comprising Prometheus and Grafana. Two dedicated CI/CD pipelines — one for continuous integration and delivery, and one for DevSecOps — ensure code quality, automated releases, and security scanning across every change.
+Consistium is a lightweight, statically-served habit tracking application built with HTML, CSS, and JavaScript. The application is containerized using Docker and served through Nginx, with a full observability stack comprising Prometheus and Grafana for metrics, and Loki with Promtail for log aggregation. Two dedicated CI/CD pipelines — one for continuous integration and delivery, and one for DevSecOps — ensure code quality, automated releases, and security scanning across every change.
 
 The following diagram illustrates the end-to-end system architecture, from source control through deployment and runtime monitoring.
 
@@ -25,6 +25,8 @@ graph TB
             Exporter["nginx-exporter<br/>nginx-prometheus-exporter:1.1.0<br/>:9113"]
             Prometheus["prometheus<br/>prom/prometheus:v2.51.0<br/>:9090"]
             Grafana["grafana<br/>grafana/grafana:10.4.1<br/>:3001 → :3000"]
+            Loki["loki<br/>grafana/loki:2.9.2<br/>:3100"]
+            Promtail["promtail<br/>grafana/promtail:latest<br/>:9080"]
         end
     end
 
@@ -43,9 +45,14 @@ graph TB
     Exporter -->|"scrape :9113<br/>every 15s"| Prometheus
     Prometheus -->|"data source"| Grafana
 
+    Consistium -->|"container logs"| Promtail
+    Promtail -->|"push logs"| Loki
+    Loki -->|"data source"| Grafana
+
     Browser -->|":3000"| Consistium
     Ops -->|":3001"| Grafana
     Ops -->|":9090"| Prometheus
+    Ops -->|":3100"| Loki
 ```
 
 ---
@@ -98,13 +105,16 @@ All four services are defined in a single `docker-compose.yml` file, enabling on
 
 ## Observability Layer
 
-The observability stack provides real-time insight into Nginx performance and connection metrics through a three-tier pipeline: **exporter → time-series database → visualization**.
+The observability stack provides real-time insight into Nginx performance and connection metrics through a **metrics pipeline** (exporter → time-series database → visualization) and a **logs pipeline** (container logs → log collector → log aggregation → visualization).
 
 ### Metrics Collection Pipeline
 
 ```
 consistium ──► nginx-exporter ──► prometheus ──► grafana
  /stub_status     :9113            :9090          :3001
+
+all containers ──► promtail ──► loki ──► grafana
+ docker logs        :9080       :3100     :3001
 ```
 
 1. **nginx-exporter** (`nginx/nginx-prometheus-exporter:1.1.0`): Connects to the Nginx `/stub_status` endpoint on the `consistium` container and translates the raw Nginx metrics into Prometheus-compatible format. Exposed on port `9113`.
@@ -112,6 +122,10 @@ consistium ──► nginx-exporter ──► prometheus ──► grafana
 2. **Prometheus** (`prom/prometheus:v2.51.0`): Scrapes the nginx-exporter target every **15 seconds**, storing time-series data for connection counts, request rates, and active/waiting connections. Accessible on port `9090` for direct PromQL queries.
 
 3. **Grafana** (`grafana/grafana:10.4.1`): Provides pre-configured dashboards for visualizing Nginx metrics. Accessible on host port `3001` (mapped to container port `3000`). Ships with default credentials (`admin` / `admin`) for initial setup.
+
+4. **Loki** (`grafana/loki:2.9.2`): Log aggregation system that indexes log metadata (labels) rather than log content, making it cost-efficient. Accessible on port `3100`. Uses LogQL for queries.
+
+5. **Promtail** (`grafana/promtail:latest`): Log collection agent that discovers running Docker containers via the Docker socket and ships their stdout/stderr logs to Loki. Runs on port `9080` (internal only).
 
 ### Key Metrics Exposed
 
@@ -173,6 +187,7 @@ graph LR
         P9090[":9090"]
         P9113[":9113"]
         P3001[":3001"]
+        P3100[":3100"]
     end
 
     subgraph Docker["Docker Bridge Network"]
@@ -180,6 +195,8 @@ graph LR
         E9113["nginx-exporter<br/>:9113"]
         PR9090["prometheus<br/>:9090"]
         G3000["grafana<br/>:3000"]
+        L3100["loki<br/>:3100"]
+        PT9080["promtail<br/>:9080"]
     end
 
     P3000 -->|"3000 → 80"| C80
@@ -190,6 +207,10 @@ graph LR
     C80 -->|"/stub_status"| E9113
     E9113 -->|"scrape"| PR9090
     PR9090 -->|"datasource"| G3000
+
+    P3100 -->|"3100 → 3100"| L3100
+    PT9080 -->|"push"| L3100
+    L3100 -->|"datasource"| G3000
 ```
 
 | Service | Host Port | Container Port | Protocol | Access |
@@ -198,6 +219,8 @@ graph LR
 | nginx-exporter | `9113` | `9113` | HTTP | Internal / debug |
 | prometheus | `9090` | `9090` | HTTP | Operations |
 | grafana | `3001` | `3000` | HTTP | Operations |
+| loki | `3100` | `3100` | HTTP | Operations |
+| promtail | — | `9080` | HTTP | Internal only |
 
 ---
 
@@ -219,4 +242,6 @@ graph LR
 | **TruffleHog** | Latest | Security | Git history secret scanning |
 | **CodeQL** | Latest | Security | Static Application Security Testing (JavaScript) |
 | **Trivy** | Latest | Security | Filesystem and container image vulnerability scanning |
+| **Loki** | 2.9.2 | Observability | Log aggregation, storage, and querying via LogQL |
+| **Promtail** | latest | Observability | Log collection and shipping via Docker service discovery |
 | **Semantic Versioning** | — | Release | Automated version tagging and GitHub Release creation |

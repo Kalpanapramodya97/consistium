@@ -1,6 +1,6 @@
 # Docker & Container Setup
 
-Consistium is a lightweight, static front-end habit tracker application. Its containerization strategy reflects this simplicity: a single **nginx:alpine** image serves the static assets (HTML, CSS, JavaScript) with production-grade defaults — gzip compression, long-lived cache headers, and a minimal resource footprint. An accompanying **Docker Compose** stack layers on observability through Prometheus metrics export and Grafana dashboards, giving full production visibility without bloating the core application image.
+Consistium is a lightweight, static front-end habit tracker application. Its containerization strategy reflects this simplicity: a single **nginx:alpine** image serves the static assets (HTML, CSS, JavaScript) with production-grade defaults — gzip compression, long-lived cache headers, and a minimal resource footprint. An accompanying **Docker Compose** stack layers on observability through Prometheus metrics export and Grafana dashboards, and log aggregation through Loki and Promtail, giving full production visibility without bloating the core application image.
 
 The entire stack — app, metrics exporter, time-series database, and dashboard — runs comfortably on a single machine with under **256 MB of total RAM**, making it ideal for personal servers, Raspberry Pi deployments, and CI/CD preview environments.
 
@@ -124,7 +124,7 @@ The `try_files` directive attempts to serve the requested URI as a file, then as
 
 ## Docker Compose Services
 
-The `docker-compose.yml` defines four services that form a complete application-plus-observability stack:
+The `docker-compose.yml` defines six services that form a complete application-plus-observability stack:
 
 ```mermaid
 graph LR
@@ -132,6 +132,9 @@ graph LR
     B -->|":80/stub_status"| C["nginx-exporter :9113"]
     C -->|"metrics"| D["prometheus :9090"]
     D -->|"data source"| E["grafana :3001"]
+    B -->|"container logs"| F["promtail :9080"]
+    F -->|"push"| G["loki :3100"]
+    G -->|"data source"| E
 ```
 
 ### 1. `consistium` — Application Server
@@ -223,6 +226,52 @@ grafana:
 | `environment` | `GF_SECURITY_ADMIN_PASSWORD=admin` | Sets the initial admin password. **Change this in production** or use Docker secrets. |
 | `ports: "3001:3000"` | Maps host port **3001** to Grafana's default port 3000. Access dashboards at `http://localhost:3001`. The host port is offset to avoid conflicts with the Consistium app on port 3000. |
 
+### 5. `loki` — Log Aggregation Engine
+
+```yaml
+loki:
+  image: grafana/loki:2.9.2
+  container_name: loki
+  ports:
+    - "3100:3100"
+  volumes:
+    - ./loki/loki-config.yml:/etc/loki/local-config.yaml
+  command: -config.file=/etc/loki/local-config.yaml
+  restart: unless-stopped
+```
+
+| Field | Value | Purpose |
+|-------|-------|---------|
+| `image` | `grafana/loki:2.9.2` | Loki is a log aggregation system by Grafana Labs. It indexes metadata (labels) rather than log content, making it lightweight and cost-efficient. |
+| `ports: "3100:3100"` | Exposes the Loki API and push endpoint on the host for debugging and direct LogQL queries. |
+| `volumes` | Bind-mounts the local `loki-config.yml` configuration file, which defines storage backend, schema, and ring configuration. |
+| `command` | Overrides the default config path to use the bind-mounted configuration file. |
+
+### 6. `promtail` — Log Collection Agent
+
+```yaml
+promtail:
+  image: grafana/promtail:latest
+  container_name: promtail
+  volumes:
+    - ./promtail/promtail-config.yml:/etc/promtail/config.yml
+    - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+  command: -config.file=/etc/promtail/config.yml
+  restart: unless-stopped
+```
+
+| Field | Value | Purpose |
+|-------|-------|---------|
+| `image` | `grafana/promtail:latest` | Promtail is Loki's dedicated log shipping agent. It discovers containers via the Docker socket and tails their logs. |
+| `volumes` (config) | Bind-mounts the Promtail configuration file defining scrape targets, label extraction, and the Loki push URL. |
+| `volumes` (containers) | Mounts `/var/lib/docker/containers` as **read-only** (`ro`) to access container log files on disk. |
+| `volumes` (socket) | Mounts the Docker socket to enable **Docker service discovery** — Promtail automatically discovers running containers without static configuration. |
+| `command` | Points Promtail to the bind-mounted configuration file. |
+
+> [!WARNING]
+> Mounting the Docker socket (`/var/run/docker.sock`) grants the container access to the Docker API. In production, consider using a read-only Docker socket proxy to limit exposure.
+
 ---
 
 ## Resource Management
@@ -305,7 +354,7 @@ When combined with `restart: unless-stopped`, an unhealthy container is automati
 
 ### Docker Compose Default Network
 
-Docker Compose automatically creates a **bridge network** for the stack (e.g., `consistium_default`). All four services are attached to this network and can communicate using their **service names** as hostnames.
+Docker Compose automatically creates a **bridge network** for the stack (e.g., `consistium_default`). All six services are attached to this network and can communicate using their **service names** as hostnames.
 
 ```mermaid
 graph TB
@@ -314,17 +363,22 @@ graph TB
         B["nginx-exporter<br/>:9113"]
         C["prometheus<br/>:9090"]
         D["grafana<br/>:3000"]
+        E["loki<br/>:3100"]
+        F["promtail<br/>:9080"]
     end
 
     A -- "stub_status :80" --> B
     B -- "metrics :9113" --> C
     C -- "data source :9090" --> D
+    F -- "push :3100" --> E
+    E -- "data source :3100" --> D
 
     subgraph "Host Machine"
-        E[":3000 → consistium:80"]
-        F[":9113 → exporter:9113"]
-        G[":9090 → prometheus:9090"]
-        H[":3001 → grafana:3000"]
+        G[":3000 → consistium:80"]
+        H[":9113 → exporter:9113"]
+        I[":9090 → prometheus:9090"]
+        J[":3001 → grafana:3000"]
+        K[":3100 → loki:3100"]
     end
 ```
 
@@ -335,6 +389,8 @@ graph TB
 | `nginx-exporter` | `consistium:80/stub_status` | Docker DNS resolves `consistium` to the container's internal IP. Traffic stays on the bridge network — it never touches the host's network stack. |
 | `prometheus` | `nginx-exporter:9113/metrics` | Same mechanism. Prometheus's `scrape_configs` references the service name. |
 | `grafana` | `prometheus:9090` | Grafana's data source configuration uses `http://prometheus:9090` as the URL. |
+| `promtail` | `loki:3100/loki/api/v1/push` | Docker DNS resolves `loki` to the container's internal IP. Promtail pushes log entries to Loki's HTTP API. |
+| `grafana` | `loki:3100` | Grafana queries Loki as a data source for log visualization. |
 
 ### Port Mappings (Host ↔ Container)
 
@@ -344,6 +400,8 @@ graph TB
 | `9113` | `9113` | nginx-exporter | Metrics debugging |
 | `9090` | `9090` | prometheus | PromQL queries & UI |
 | `3001` | `3000` | grafana | Dashboard access |
+| `3100` | `3100` | loki | Log aggregation API |
+| — | `9080` | promtail | Internal (no host port) |
 
 > [!NOTE]
 > Internal container-to-container traffic uses the **container ports** (e.g., `80`, `9113`). Host port mappings are only relevant for external access from the host machine or network.
@@ -414,6 +472,7 @@ docker inspect --format='{{json .State.Health}}' consistium
 | Prometheus UI | [http://localhost:9090](http://localhost:9090) |
 | Grafana Dashboard | [http://localhost:3001](http://localhost:3001) |
 | Nginx Metrics (raw) | [http://localhost:9113/metrics](http://localhost:9113/metrics) |
+| Loki API | [http://localhost:3100](http://localhost:3100) |
 
 ### Resource Usage
 
