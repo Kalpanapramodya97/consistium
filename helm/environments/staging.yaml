@@ -1,0 +1,42 @@
+# ──────────────────────────────────────────────────────────────
+# Staging Environment — Production-like with reduced capacity
+# Usage: helm install consistium ./helm/consistium -f helm/environments/staging.yaml
+# ──────────────────────────────────────────────────────────────
+
+replicaCount: 2
+
+ingress:
+  enabled: true
+  hosts:
+    - host: consistium.staging.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: consistium-staging-tls
+      hosts:
+        - consistium.staging.example.com
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 48Mi
+  requests:
+    cpu: 50m
+    memory: 16Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 75
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true

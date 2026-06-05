@@ -1,6 +1,6 @@
 # System Architecture
 
-Consistium is a lightweight, statically-served habit tracking application built with HTML, CSS, and JavaScript. The application is containerized using Docker and served through Nginx, with a full observability stack comprising Prometheus and Grafana for metrics, and Loki with Promtail for log aggregation. Two dedicated CI/CD pipelines — one for continuous integration and delivery, and one for DevSecOps — ensure code quality, automated releases, and security scanning across every change.
+Consistium is a lightweight, statically-served habit tracking application built with HTML, CSS, and JavaScript. The application is containerized using Docker and served through Nginx, with a full observability stack comprising Prometheus and Grafana for metrics, and Loki with Promtail for log aggregation. A production-grade Helm chart enables Kubernetes deployment with autoscaling, security hardening, and multi-environment support. Two dedicated CI/CD pipelines — one for continuous integration and delivery, and one for DevSecOps — ensure code quality, automated releases, and security scanning across every change.
 
 The following diagram illustrates the end-to-end system architecture, from source control through deployment and runtime monitoring.
 
@@ -141,6 +141,74 @@ all containers ──► promtail ──► loki ──► grafana
 
 ---
 
+## Kubernetes Orchestration Layer
+
+For production deployments, Consistium includes a Helm chart that packages the application as a set of Kubernetes resources with enterprise-grade features.
+
+### Helm Chart Architecture
+
+```mermaid
+graph TB
+    subgraph HelmChart["Helm Chart — consistium"]
+        direction TB
+        Deployment["Deployment\n(rolling update, security context)"]
+        Service["Service\n(ClusterIP :80)"]
+        Ingress["Ingress\n(TLS, rate limiting)"]
+        HPA["HorizontalPodAutoscaler\n(CPU 70% / Memory 80%)"]
+        PDB["PodDisruptionBudget\n(minAvailable: 1)"]
+        NP["NetworkPolicy\n(ingress + egress rules)"]
+        CM["ConfigMap\n(nginx.conf)"]
+        SA["ServiceAccount"]
+        SM["ServiceMonitor\n(Prometheus Operator)"]
+    end
+
+    subgraph Envs["Environment Overrides"]
+        Dev["dev.yaml\n1 replica, no HPA"]
+        Staging["staging.yaml\n2 replicas, HPA 2-5"]
+        Prod["prod.yaml\n3 replicas, HPA 3-10"]
+    end
+
+    Ingress --> Service
+    Service --> Deployment
+    HPA --> Deployment
+    PDB --> Deployment
+    NP --> Deployment
+    CM --> Deployment
+    SA --> Deployment
+    SM --> Service
+
+    Dev -.->|"helm -f"| HelmChart
+    Staging -.->|"helm -f"| HelmChart
+    Prod -.->|"helm -f"| HelmChart
+```
+
+### Kubernetes Resources
+
+| Resource | Purpose |
+|---|---|
+| **Deployment** | Rolling updates, security context (non-root, read-only FS, drop all capabilities), liveness/readiness/startup probes, pod anti-affinity |
+| **Service** | ClusterIP service exposing port 80 with named ports |
+| **Ingress** | TLS termination via cert-manager, rate limiting (50 rps), SSL redirect, HSTS in production |
+| **HPA** | Autoscaling 2→10 pods on CPU (70%) and memory (80%) with stabilization policies |
+| **PDB** | Guarantees minimum availability during node drains and cluster upgrades |
+| **NetworkPolicy** | Zero-trust: ingress only from ingress-nginx and monitoring namespaces, egress DNS-only |
+| **ConfigMap** | Nginx configuration with security headers (CSP, X-Frame-Options), structured logging |
+| **ServiceAccount** | Dedicated non-default service account for RBAC |
+| **ServiceMonitor** | Prometheus Operator CRD for automatic scrape target discovery |
+
+### Multi-Environment Strategy
+
+| Feature | Dev | Staging | Production |
+|---|---|---|---|
+| Replicas | 1 | 2 | 3 |
+| HPA Range | Disabled | 2–5 | 3–10 |
+| PDB | Disabled | minAvailable: 1 | minAvailable: 2 |
+| Network Policy | Disabled | Enabled | Enabled |
+| TLS | Disabled | Enabled | Enabled + HSTS |
+| Pod Anti-Affinity | None | Preferred | **Required** |
+
+---
+
 ## CI/CD Layer
 
 The project uses a GitHub Actions workflow (`ci.yml`) that automates quality checks, container image builds, and semantic releases on every push or pull request targeting the `main` or `master` branches.
@@ -242,6 +310,8 @@ graph LR
 | **TruffleHog** | Latest | Security | Git history secret scanning |
 | **CodeQL** | Latest | Security | Static Application Security Testing (JavaScript) |
 | **Trivy** | Latest | Security | Filesystem and container image vulnerability scanning |
+| **Helm** | v3.12+ | Orchestration | Kubernetes package management with templated manifests |
+| **Kubernetes** | v1.27+ | Orchestration | Container orchestration with Deployment, HPA, PDB, NetworkPolicy |
 | **Loki** | 2.9.2 | Observability | Log aggregation, storage, and querying via LogQL |
 | **Promtail** | latest | Observability | Log collection and shipping via Docker service discovery |
 | **Semantic Versioning** | — | Release | Automated version tagging and GitHub Release creation |

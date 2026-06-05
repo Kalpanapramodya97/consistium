@@ -1,0 +1,85 @@
+# ──────────────────────────────────────────────────────────────
+# Production Environment — Full HA, strict security, TLS enforced
+# Usage: helm install consistium ./helm/consistium -f helm/environments/prod.yaml
+# ──────────────────────────────────────────────────────────────
+
+replicaCount: 3
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/limit-rps: "30"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: consistium.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: consistium-prod-tls
+      hosts:
+        - consistium.example.com
+
+resources:
+  limits:
+    cpu: 250m
+    memory: 64Mi
+  requests:
+    cpu: 100m
+    memory: 32Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+networkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  interval: 10s
+
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - consistium
+        topologyKey: kubernetes.io/hostname
+
+nginx:
+  workerProcesses: "auto"
+  workerConnections: 2048
+  keepaliveTimeout: 65
+  gzip: true
+  cacheExpiry: "30d"

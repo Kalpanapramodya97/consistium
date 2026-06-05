@@ -30,6 +30,7 @@
 - **Responsive Design** — Works beautifully on mobile and desktop
 - **🐳 Docker Support** — One-command deployment with Docker Compose and Nginx
 - **📊 Observability** — Built-in Prometheus & Grafana stack for monitoring Nginx metrics
+- **☸️ Kubernetes Ready** — Production-grade Helm chart with HPA, PDB, NetworkPolicy, ServiceMonitor, and multi-environment support (dev/staging/prod)
 
 ## 🔄 Habit Types
  
@@ -77,6 +78,29 @@ docker run -d -p 3000:80 --name consistium-app ghcr.io/kalpanapramodya97/consist
 
 The app will be available at `http://localhost:3000`.
 
+### Option 4 — Kubernetes (Helm Chart)
+
+Deploy to any Kubernetes cluster with the included production-grade Helm chart:
+
+```bash
+# Development
+helm install consistium ./helm/consistium \
+  -f helm/environments/dev.yaml \
+  -n consistium --create-namespace
+
+# Staging
+helm install consistium ./helm/consistium \
+  -f helm/environments/staging.yaml \
+  -n consistium-staging --create-namespace
+
+# Production (HA — 3 replicas, HPA, PDB, NetworkPolicy, TLS)
+helm install consistium ./helm/consistium \
+  -f helm/environments/prod.yaml \
+  -n consistium-prod --create-namespace
+```
+
+See [Kubernetes Deployment Guide](docs/devops/kubernetes.md) for full details.
+
 ## 🎯 Default Habits
 
 | Emoji | Habit |
@@ -95,6 +119,7 @@ The app will be available at `http://localhost:3000`.
 - **Vanilla JavaScript** — Zero dependencies, IIFE pattern
 - **localStorage** — Client-side persistence
 - **Docker + Nginx** — Containerised deployment
+- **Kubernetes + Helm** — Production-grade Helm chart with HPA, PDB, NetworkPolicy, and multi-environment configs
 - **Prometheus & Grafana** — Full observability stack with metrics and dashboards via Docker Compose
 
 ## 📸 Design Highlights

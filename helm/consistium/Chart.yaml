@@ -1,0 +1,20 @@
+apiVersion: v2
+name: consistium
+description: A Helm chart for Consistium — Atomic Habit Tracker
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - habit-tracker
+  - nginx
+  - static-site
+  - productivity
+
+home: https://github.com/Kalpanapramodya97/consistium
+sources:
+  - https://github.com/Kalpanapramodya97/consistium
+
+maintainers:
+  - name: Kalpana Pramodya
+    url: https://github.com/Kalpanapramodya97
