@@ -1,163 +1,148 @@
-# ◆ Consistium — Atomic Habit Tracker
+<div align="center">
+  <img src="assets/consistium-logo.svg" alt="Consistium Logo" width="120" />
+  
+  # ◆ Consistium
 
+  <p align="center">
+    <strong>Atomic Habit Tracker</strong>
+  </p>
+  
+  <p align="center">
+    <a href="#-features">Features</a> •
+    <a href="#-getting-started">Getting Started</a> •
+    <a href="#-gallery">Gallery</a> •
+    <a href="#-devsecops--architecture">Architecture</a>
+  </p>
+
+  <p align="center">
+    <img src="https://img.shields.io/github/license/Kalpanapramodya97/consistium?color=blue&style=flat-square" alt="License" />
+    <img src="https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white" alt="HTML5" />
+    <img src="https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white" alt="CSS3" />
+    <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black" alt="JavaScript" />
+    <img src="https://img.shields.io/badge/Docker-2CA5E0?style=flat-square&logo=docker&logoColor=white" alt="Docker" />
+    <img src="https://img.shields.io/badge/Kubernetes-326CE5?style=flat-square&logo=kubernetes&logoColor=white" alt="Kubernetes" />
+  </p>
+</div>
+
+<br/>
 
 > *"You do not rise to the level of your goals. You fall to the level of your systems."* — James Clear
 
-**Consistium** is a premium daily habit tracker inspired by James Clear's *Atomic Habits*. Track your habits, build streaks, and become 1% better every day.
+**Consistium** is a premium daily habit tracker inspired by James Clear's *Atomic Habits*. Track your habits, build streaks, and become 1% better every day. It features a frictionless UI, motivational elements, and production-grade DevOps deployment capabilities.
 
 <p align="center">
-  <img src="assets/screenshot.png" alt="Consistium App Preview" width="800"/>
+  <img src="assets/screenshot.png" alt="Consistium App Preview" width="800" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
 </p>
+
+---
 
 ## ✨ Features
 
-- **Daily Habit Tracking** — Tap to mark habits complete with satisfying animations
-- **Good vs. Bad Habits** — Build positive routines or track habits you're trying to break
-- **Special Tasks** — Add one-off daily tasks that do not repeat
-- **Reverse Logic for Bad Habits** — Bad habits are marked as "Resisted" (complete) by default and only "Slipped" if checked
-- **Score Ring** — Visual progress indicator with animated percentage
-- **Streak Counter** — Track consecutive perfect days
-- **Weekly Heatmap** — See your weekly consistency at a glance
-- **Add/Edit/Delete Habits** — Full CRUD with emoji picker
-- **Date Navigation** — Review past days or plan ahead (← → arrow keys)
-- **Confetti Celebration** — Perfect day triggers confetti animation 🎉
-- **🌗 Light & Dark Theme** — Default light theme with a one-click dark mode toggle; automatically respects your system colour-scheme preference
-- **150+ Curated Quotes** — Motivational quotes from *Atomic Habits*, *Deep Work*, *Mindset*, and *Wild Courage*
-- **Quote Navigation** — Browse quotes manually with ← → arrows, or let them auto-rotate every 5 minutes
-- **Data Persistence** — All data saved in localStorage
-- **Import/Export** — Backup and restore your data as JSON
-- **Keyboard Shortcuts** — Arrow keys for navigation, Escape to close modals
-- **Responsive Design** — Works beautifully on mobile and desktop
-- **🐳 Docker Support** — One-command deployment with Docker Compose and Nginx
-- **📊 Observability** — Built-in Prometheus & Grafana stack for monitoring Nginx metrics
-- **☸️ Kubernetes Ready** — Production-grade Helm chart with HPA, PDB, NetworkPolicy, ServiceMonitor, and multi-environment support (dev/staging/prod)
+### 🎯 Habit Tracking
+- **Daily Habits** — Tap to mark habits complete with satisfying micro-animations.
+- **Good vs. Bad Habits** — Build positive routines or track habits you're trying to break. 
+  - *Bad habits use reverse logic: they are marked as "Resisted ✓" by default and only "Slipped ✗" if checked.*
+- **Special Tasks** — Add one-off daily tasks that do not repeat but contribute to your daily score.
+- **Full CRUD** — Easily Add, Edit, or Delete habits with a built-in emoji picker.
 
-## 🔄 Habit Types
- 
- Consistium supports three types of activities to help you design your ideal life:
- 
-- **Good Habits (Build)** — Activities you want to perform. They are marked as "Done" when checked.
-- **Bad Habits (Break)** — Activities you want to avoid. These use reverse logic: they are marked as **"Resisted ✓"** (successful) by default. If you perform the habit, you check it to mark it as **"Slipped ✗"**.
-- **Special Tasks (One-time)** — Day-specific tasks that do not recur. These only show up on the day they are created and contribute to that day's score.
- 
+### 📊 Gamification & Insights
+- **Score Ring** — Visual progress indicator with an animated percentage completion.
+- **Streak Counter** — Track consecutive perfect days to maintain momentum.
+- **Weekly Heatmap** — See your weekly consistency at a glance with GitHub-style intensity levels.
+- **Confetti Celebration** — Completing all habits on a perfect day triggers a confetti animation 🎉.
+
+### 🎨 Design & Experience
+- **🌗 Light & Dark Theme** — One-click dark mode toggle that automatically respects your OS colour-scheme preference.
+- **150+ Curated Quotes** — Motivational quotes from *Atomic Habits*, *Deep Work*, *Mindset*, and *Wild Courage*. Browse them or let them auto-rotate every 5 minutes.
+- **Keyboard Navigation** — Seamlessly navigate between days using the `←` and `→` arrow keys.
+- **Local Persistence** — Zero tracking, zero accounts. All data is securely saved in your browser's `localStorage`.
+- **Import / Export** — Full JSON backup and restore capabilities.
+
+---
+
 ## 🚀 Getting Started
 
-### Option 1 — Static File (No Installation)
+Consistium is designed to be completely flexible. Run it locally with zero dependencies, or deploy it to a Kubernetes cluster.
 
-Simply open `index.html` in any modern browser. No build tools, no dependencies, no server required.
-
+### 📦 Option 1: Static File (No Installation)
+Because the app is built with Vanilla JS, you can simply clone and run it directly in your browser.
 ```bash
-# Clone the repo
 git clone https://github.com/Kalpanapramodya97/consistium.git
 cd consistium
-
-# Open in browser
-start index.html   # Windows
-open index.html    # macOS
+open index.html  # Windows: start index.html
 ```
 
-### Option 2 — Docker Compose (Local Build)
-
-Run with Docker Compose for a production-ready Nginx setup. This builds the image locally from the source code:
-
+### 🐳 Option 2: Docker Compose (Local Build)
+Run with Docker Compose for a production-ready Nginx setup. This builds the image locally.
 ```bash
 docker compose up -d
+# 🔗 Access at http://localhost:3000
 ```
 
-The app will be available at `http://localhost:3000`.
-
-### Option 3 — Pre-built Docker Image (GHCR)
-
-You can run the pre-built image directly from our GitHub Container Registry. You don't need to clone the repository, install dependencies, or even explicitly pull the image. Docker handles everything automatically:
-
+### ☁️ Option 3: Pre-built Docker Image (GHCR)
+Run the pre-built image directly from the GitHub Container Registry. No cloning required!
 ```bash
-docker run -d -p 3000:80 --name consistium-app ghcr.io/kalpanapramodya97/consistium/habit-tracker:latest
+docker run -d -p 3000:80 --name consistium ghcr.io/kalpanapramodya97/consistium/habit-tracker:latest
 ```
 
-*(Note: If the image isn't already on your machine, Docker will automatically download it from the registry and start the server.)*
-
-The app will be available at `http://localhost:3000`.
-
-### Option 4 — Kubernetes (Helm Chart)
-
-Deploy to any Kubernetes cluster with the included production-grade Helm chart:
-
+### ☸️ Option 4: Kubernetes (Helm Chart)
+Deploy to any Kubernetes cluster with the included production-grade Helm chart. Includes HPA, PDBs, and NetworkPolicies.
 ```bash
-# Development
-helm install consistium ./helm/consistium \
-  -f helm/environments/dev.yaml \
-  -n consistium --create-namespace
-
-# Staging
-helm install consistium ./helm/consistium \
-  -f helm/environments/staging.yaml \
-  -n consistium-staging --create-namespace
-
-# Production (HA — 3 replicas, HPA, PDB, NetworkPolicy, TLS)
 helm install consistium ./helm/consistium \
   -f helm/environments/prod.yaml \
   -n consistium-prod --create-namespace
 ```
-
-See [Kubernetes Deployment Guide](docs/devops/kubernetes.md) for full details.
-
-## 🎯 Default Habits
-
-| Emoji | Habit |
-|-------|-------|
-| 📚 | Read 10 pages |
-| 💪 | Gym workout |
-| 🗣️ | Table topic speech |
-| 💻 | DevOps tutorials × 2 |
-| 📝 | 12 job applications |
-| 💼 | Message 5 LinkedIn recruiters & comment on 2 posts |
-
-## 🛠 Tech Stack
-
-- **HTML5** — Semantic structure
-- **CSS3** — Custom properties, animations, glassmorphism
-- **Vanilla JavaScript** — Zero dependencies, IIFE pattern
-- **localStorage** — Client-side persistence
-- **Docker + Nginx** — Containerised deployment
-- **Kubernetes + Helm** — Production-grade Helm chart with HPA, PDB, NetworkPolicy, and multi-environment configs
-- **Prometheus & Grafana** — Full observability stack with metrics and dashboards via Docker Compose
-
-## 📸 Design Highlights
-
-- Light & dark themes with ambient floating orbs
-- One-click theme toggle with system-preference detection
-- Animated score ring with gradient stroke
-- Micro-interactions on hover and completion
-- Confetti celebration on perfect days
-- Weekly heatmap with intensity levels
-- 150+ quotes across 4 books with fade-transition navigation
-- Premium typography with Inter & JetBrains Mono
-
-## 🖼️ Gallery
-
-### App & Features
-<p align="center">
-  <img width="800" alt="App Dashboard" src="https://github.com/user-attachments/assets/8d9306da-5127-4a41-97e4-404d52740284" />
-</p>
-
-### DevOps & Observability
-<p align="center">
-  <img width="800" alt="Prometheus Metrics" src="https://github.com/user-attachments/assets/1972a363-efeb-4d88-97cc-74ec75ec7bce" />
-</p>
-
-<p align="center">
-  <img width="800" alt="Grafana Dashboard" src="https://github.com/user-attachments/assets/8a6b89bd-867b-456d-a120-dbc22faa3b25" />
-</p>
-
-### DevSecOps & Security
-
-<img width="1307" height="882" alt="image" src="https://github.com/user-attachments/assets/ce746aa5-c716-4158-8d4a-6806ace3fefe" />
-
-
-## 📄 License
-
-MIT © 2026 Kalpana Pramodya
+> 📚 See the full [Kubernetes Deployment Guide](docs/devops/kubernetes.md) for more details.
 
 ---
 
-*Built with ♦ Consistium — 1% better every day*
+## 🛠 DevSecOps & Architecture
+
+Consistium goes beyond just being a frontend app—it serves as a **reference architecture for modern DevSecOps**.
+
+| Layer | Technologies |
+|:---|:---|
+| **Frontend** | HTML5, CSS3 (Glassmorphism), Vanilla JavaScript |
+| **Containerization** | Docker, multi-stage Alpine Nginx builds |
+| **Orchestration** | Kubernetes, Helm v3 |
+| **Observability** | Prometheus, Grafana, Loki (LogQL) |
+| **Security (CI/CD)** | GitHub Actions, TruffleHog (Secrets), CodeQL (SAST), Trivy (CVEs) |
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Security-A+ Grade-success?style=for-the-badge&logo=security" alt="Security Grade" />
+</p>
+
+The project features a fully automated DevSecOps pipeline that runs **SAST**, **Secret Scanning**, and **Container Vulnerability Scanning**, aggregating the results into a beautiful branded HTML report and delivering it via email after every commit.
+
+---
+
+## 🖼️ Gallery
+
+### Application Interface
+<p align="center">
+  <img width="800" alt="App Dashboard" src="https://github.com/user-attachments/assets/8d9306da-5127-4a41-97e4-404d52740284" style="border-radius: 8px;" />
+</p>
+
+### Observability (Grafana & Prometheus)
+<p align="center">
+  <img width="800" alt="Prometheus Metrics" src="https://github.com/user-attachments/assets/1972a363-efeb-4d88-97cc-74ec75ec7bce" style="border-radius: 8px; margin-bottom: 20px;" />
+</p>
+<p align="center">
+  <img width="800" alt="Grafana Dashboard" src="https://github.com/user-attachments/assets/8a6b89bd-867b-456d-a120-dbc22faa3b25" style="border-radius: 8px;" />
+</p>
+
+### DevSecOps Security Report
+<p align="center">
+  <img width="1307" height="882" alt="DevSecOps Security Report" src="https://github.com/user-attachments/assets/ce746aa5-c716-4158-8d4a-6806ace3fefe" style="border-radius: 8px;" />
+</p>
+
+---
+
+## 📄 License
+
+**MIT License** © 2026 Kalpana Pramodya
+
+<div align="center">
+  <br/>
+  <em>Built with ♦ Consistium — 1% better every day</em>
+</div>
