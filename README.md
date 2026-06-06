@@ -149,6 +149,11 @@ See [Kubernetes Deployment Guide](docs/devops/kubernetes.md) for full details.
   <img width="800" alt="Grafana Dashboard" src="https://github.com/user-attachments/assets/8a6b89bd-867b-456d-a120-dbc22faa3b25" />
 </p>
 
+### DevSecOps & Security
+<p align="center">
+  <img width="800" alt="DevSecOps Security Report" src="assets/security-report.png" />
+</p>
+
 ## 📄 License
 
 MIT © 2026 Kalpana Pramodya
