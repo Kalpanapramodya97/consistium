@@ -139,7 +139,12 @@ if [[ "$DRY_RUN" == true ]]; then
     SECRET_SCAN_STATUS_CLASS="scan-passed"
     SECRET_SCAN_STATUS_ICON="✓"
 elif [[ -n "$TRUFFLEHOG_FILE" && -f "$TRUFFLEHOG_FILE" ]]; then
-    SECRET_COUNT=$(jq -s 'length' "$TRUFFLEHOG_FILE" 2>/dev/null || echo "0")
+    # If the file is just "[]" or empty, count is 0
+    if [[ ! -s "$TRUFFLEHOG_FILE" ]] || [[ "$(cat "$TRUFFLEHOG_FILE" | tr -d ' \n\r')" == "[]" ]]; then
+        SECRET_COUNT=0
+    else
+        SECRET_COUNT=$(wc -l < "$TRUFFLEHOG_FILE" 2>/dev/null || echo "0")
+    fi
 
     if [[ "$SECRET_COUNT" -gt 0 ]]; then
         CRITICAL_COUNT=$((CRITICAL_COUNT + SECRET_COUNT))
@@ -149,11 +154,14 @@ elif [[ -n "$TRUFFLEHOG_FILE" && -f "$TRUFFLEHOG_FILE" ]]; then
 
         SECRET_ROWS=""
         while IFS= read -r line; do
-            detector=$(echo "$line" | jq -r '.DetectorName // .SourceMetadata.Data.Git.file // "Unknown"' 2>/dev/null)
-            source_file=$(echo "$line" | jq -r '.SourceMetadata.Data.Git.file // "N/A"' 2>/dev/null)
-            commit=$(echo "$line" | jq -r '.SourceMetadata.Data.Git.commit // "N/A"' 2>/dev/null)
+            # Skip empty lines or pure whitespace
+            [[ -z "${line// }" ]] && continue
+            
+            detector=$(echo "$line" | jq -r '.DetectorName // .SourceMetadata.Data.Git.file // "Unknown"' 2>/dev/null || echo "Unknown")
+            source_file=$(echo "$line" | jq -r '.SourceMetadata.Data.Git.file // "N/A"' 2>/dev/null || echo "N/A")
+            commit=$(echo "$line" | jq -r '.SourceMetadata.Data.Git.commit // "N/A"' 2>/dev/null || echo "N/A")
             commit_short="${commit:0:7}"
-            verified=$(echo "$line" | jq -r '.Verified // false' 2>/dev/null)
+            verified=$(echo "$line" | jq -r '.Verified // false' 2>/dev/null || echo "false")
 
             SECRET_ROWS+="<tr>"
             SECRET_ROWS+="<td>$(severity_pill "CRITICAL")</td>"
@@ -162,7 +170,7 @@ elif [[ -n "$TRUFFLEHOG_FILE" && -f "$TRUFFLEHOG_FILE" ]]; then
             SECRET_ROWS+="<td class=\"mono\">$(html_escape "$commit_short")</td>"
             SECRET_ROWS+="<td>$([ "$verified" == "true" ] && echo "⚠️ Verified" || echo "Unverified")</td>"
             SECRET_ROWS+="</tr>"
-        done < <(jq -c '.' "$TRUFFLEHOG_FILE" 2>/dev/null)
+        done < <(cat "$TRUFFLEHOG_FILE")
 
         SECRET_SCAN_CONTENT=$(cat <<EOF
 <table class="findings-table">
