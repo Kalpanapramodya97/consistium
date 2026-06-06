@@ -479,37 +479,6 @@ REPORT="${REPORT//\{\{LOW_BAR_LABEL\}\}/${LOW_BAR_LABEL}}"
 TMPDIR_REPORT=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_REPORT"' EXIT
 
-# For multi-line HTML content, use Python for reliable substitution
-python3 -c "
-import sys
-
-report = sys.stdin.read()
-
-replacements = {
-    '{{SECRET_SCAN_CONTENT}}': open('${TMPDIR_REPORT}/secret.html').read() if True else '',
-    '{{SECRET_SCAN_STATUS}}': '${SECRET_SCAN_STATUS}',
-    '{{SECRET_SCAN_STATUS_CLASS}}': '${SECRET_SCAN_STATUS_CLASS}',
-    '{{SECRET_SCAN_STATUS_ICON}}': '${SECRET_SCAN_STATUS_ICON}',
-    '{{SAST_SCAN_CONTENT}}': open('${TMPDIR_REPORT}/sast.html').read() if True else '',
-    '{{SAST_SCAN_STATUS}}': '${SAST_SCAN_STATUS}',
-    '{{SAST_SCAN_STATUS_CLASS}}': '${SAST_SCAN_STATUS_CLASS}',
-    '{{SAST_SCAN_STATUS_ICON}}': '${SAST_SCAN_STATUS_ICON}',
-    '{{TRIVY_FS_CONTENT}}': open('${TMPDIR_REPORT}/trivy_fs.html').read() if True else '',
-    '{{TRIVY_FS_STATUS}}': '${TRIVY_FS_STATUS}',
-    '{{TRIVY_FS_STATUS_CLASS}}': '${TRIVY_FS_STATUS_CLASS}',
-    '{{TRIVY_FS_STATUS_ICON}}': '${TRIVY_FS_STATUS_ICON}',
-    '{{TRIVY_IMAGE_CONTENT}}': open('${TMPDIR_REPORT}/trivy_image.html').read() if True else '',
-    '{{TRIVY_IMAGE_STATUS}}': '${TRIVY_IMAGE_STATUS}',
-    '{{TRIVY_IMAGE_STATUS_CLASS}}': '${TRIVY_IMAGE_STATUS_CLASS}',
-    '{{TRIVY_IMAGE_STATUS_ICON}}': '${TRIVY_IMAGE_STATUS_ICON}',
-}
-
-for key, value in replacements.items():
-    report = report.replace(key, value)
-
-print(report)
-" <<< "$REPORT" > "$OUTPUT" <<'PYEOF'
-PYEOF
 
 # Write section content to temp files
 echo "$SECRET_SCAN_CONTENT" > "${TMPDIR_REPORT}/secret.html"
