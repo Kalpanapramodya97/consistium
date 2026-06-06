@@ -20,9 +20,25 @@ jobs:
       
       - name: TruffleHog Secret Scan
         uses: trufflesecurity/trufflehog@main
+        continue-on-error: true
         with:
           path: ./
-          extra_args: --debug --only-verified
+          extra_args: --debug --only-verified --json --output trufflehog-results.json
+
+      - name: Create empty results if scan found nothing
+        if: always()
+        run: |
+          if [ ! -f trufflehog-results.json ]; then
+            echo "[]" > trufflehog-results.json
+          fi
+
+      - name: Upload TruffleHog results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-results
+          path: trufflehog-results.json
+          retention-days: 90
 
   codeql-sast:
     name: CodeQL Analysis
@@ -42,6 +58,16 @@ jobs:
           
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+        with:
+          output: codeql-results
+
+      - name: Upload CodeQL SARIF results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-results
+          path: codeql-results/*.sarif
+          retention-days: 90
 
   trivy-scan:
     name: Trivy Container & FS Scan
@@ -50,7 +76,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Trivy vulnerability scanner in fs mode
+      # Phase 1: Filesystem scan — table output for logs + JSON for report
+      - name: Run Trivy filesystem scan (console)
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
@@ -59,16 +86,176 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
+        continue-on-error: true
 
+      - name: Run Trivy filesystem scan (JSON for report)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'json'
+          output: 'trivy-fs-results.json'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy FS results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-fs-results
+          path: trivy-fs-results.json
+          retention-days: 90
+
+      # Phase 2: Docker image scan
       - name: Build an image from Dockerfile
         run: |
           docker build -t habit-tracker:${{ github.sha }} .
 
-      - name: Run Trivy vulnerability scanner on built image
+      - name: Run Trivy image scan (console)
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: 'habit-tracker:${{ github.sha }}'
           format: 'table'
-          exit-code: '0' # Don't fail the build for now, just report
+          exit-code: '0'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
+
+      - name: Run Trivy image scan (JSON for report)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'habit-tracker:${{ github.sha }}'
+          format: 'json'
+          output: 'trivy-image-results.json'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy image results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-image-results
+          path: trivy-image-results.json
+          retention-days: 90
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # NEW: Security Report Generation & Email Notification
+  # ────────────────────────────────────────────────────────────────────────────
+  security-report:
+    name: Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [secret-scan, codeql-sast, trivy-scan]
+    if: always() # Generate report even if scans fail
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download TruffleHog results
+        uses: actions/download-artifact@v4
+        with:
+          name: trufflehog-results
+          path: scan-results/
+        continue-on-error: true
+
+      - name: Download CodeQL results
+        uses: actions/download-artifact@v4
+        with:
+          name: codeql-results
+          path: scan-results/
+        continue-on-error: true
+
+      - name: Download Trivy FS results
+        uses: actions/download-artifact@v4
+        with:
+          name: trivy-fs-results
+          path: scan-results/
+        continue-on-error: true
+
+      - name: Download Trivy image results
+        uses: actions/download-artifact@v4
+        with:
+          name: trivy-image-results
+          path: scan-results/
+        continue-on-error: true
+
+      - name: List downloaded scan results
+        run: |
+          echo "📂 Downloaded scan results:"
+          ls -la scan-results/ || echo "No scan results directory"
+          echo ""
+          echo "📄 File contents preview:"
+          for f in scan-results/*; do
+            if [ -f "$f" ]; then
+              echo "--- $f ($(wc -c < "$f") bytes) ---"
+              head -c 500 "$f"
+              echo ""
+            fi
+          done
+
+      - name: Install jq
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq
+
+      - name: Make report generator executable
+        run: chmod +x security/generate-report.sh
+
+      - name: Detect CodeQL SARIF file
+        id: detect-sarif
+        run: |
+          SARIF_FILE=$(find scan-results/ -name "*.sarif" -type f | head -1)
+          echo "sarif_file=${SARIF_FILE:-}" >> $GITHUB_OUTPUT
+          echo "Found SARIF: ${SARIF_FILE:-none}"
+
+      - name: Generate branded security report
+        run: |
+          bash security/generate-report.sh \
+            --trufflehog "scan-results/trufflehog-results.json" \
+            --codeql "${{ steps.detect-sarif.outputs.sarif_file }}" \
+            --trivy-fs "scan-results/trivy-fs-results.json" \
+            --trivy-image "scan-results/trivy-image-results.json" \
+            --template "security/report-template.html" \
+            --output "consistium-security-report.html"
+
+      - name: Upload security report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: consistium-security-report
+          path: consistium-security-report.html
+          retention-days: 90
+
+      - name: Send security report via email
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "🛡️ Consistium Security Report — ${{ github.ref_name }} — Run #${{ github.run_number }}"
+          to: kalpanapramodya97@gmail.com
+          from: Consistium DevSecOps <kalpanapramodya97@gmail.com>
+          body: |
+            Consistium DevSecOps Pipeline — Security Scan Report
+
+            ────────────────────────────────────────────
+            📋 Pipeline Run Details
+            ────────────────────────────────────────────
+            • Branch:   ${{ github.ref_name }}
+            • Commit:   ${{ github.sha }}
+            • Trigger:  ${{ github.event_name }}
+            • Run:      #${{ github.run_number }}
+            • Date:     ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at || 'scheduled' }}
+
+            The full branded security report is attached to this email as an HTML file.
+            Open it in any web browser to view the detailed findings.
+
+            🔗 View the full pipeline run:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            ────────────────────────────────────────────
+            This is an automated email from the Consistium DevSecOps Pipeline.
+            ◆ Consistium — 1% better every day
+          attachments: consistium-security-report.html

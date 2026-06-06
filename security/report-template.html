@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consistium Security Report</title>
+    <style>
+        /* ===== RESET & BASE ===== */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #0d1b2e;
+            --bg-card: rgba(13, 27, 46, 0.85);
+            --bg-card-hover: rgba(20, 40, 65, 0.9);
+            --border-color: rgba(0, 212, 255, 0.15);
+            --border-glow: rgba(0, 212, 255, 0.3);
+            --text-primary: #e6f1ff;
+            --text-secondary: #8892b0;
+            --text-muted: #5a6580;
+            --accent-cyan: #00d4ff;
+            --accent-blue: #0088cc;
+            --accent-purple: #6c63ff;
+            --severity-critical: #ff2d55;
+            --severity-critical-bg: rgba(255, 45, 85, 0.12);
+            --severity-high: #ff9500;
+            --severity-high-bg: rgba(255, 149, 0, 0.12);
+            --severity-medium: #f5c542;
+            --severity-medium-bg: rgba(245, 197, 66, 0.12);
+            --severity-low: #30d158;
+            --severity-low-bg: rgba(48, 209, 88, 0.12);
+            --severity-info: #64d2ff;
+            --severity-info-bg: rgba(100, 210, 255, 0.12);
+            --pass-color: #30d158;
+            --pass-bg: rgba(48, 209, 88, 0.12);
+            --fail-color: #ff2d55;
+            --fail-bg: rgba(255, 45, 85, 0.12);
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 212, 255, 0.08);
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== BACKGROUND EFFECTS ===== */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background:
+                radial-gradient(ellipse at 20% 0%, rgba(0, 212, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 100%, rgba(108, 99, 255, 0.06) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== HEADER ===== */
+        .report-header {
+            text-align: center;
+            margin-bottom: 48px;
+            padding: 48px 40px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-card);
+            backdrop-filter: blur(12px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .report-header::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple), var(--accent-cyan));
+        }
+
+        .logo-container {
+            margin-bottom: 20px;
+        }
+
+        .logo-container svg {
+            height: 70px;
+            width: auto;
+        }
+
+        .report-title {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: var(--accent-cyan);
+            margin-bottom: 8px;
+        }
+
+        .report-subtitle {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 24px;
+        }
+
+        /* ===== METADATA BAR ===== */
+        .metadata-bar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 24px;
+            padding: 16px 24px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .meta-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .meta-value {
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            background: rgba(0, 212, 255, 0.08);
+            padding: 3px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 212, 255, 0.12);
+        }
+
+        /* ===== STATUS BADGE ===== */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 28px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 24px;
+        }
+
+        .status-pass {
+            background: var(--pass-bg);
+            color: var(--pass-color);
+            border: 1px solid rgba(48, 209, 88, 0.3);
+            box-shadow: 0 0 20px rgba(48, 209, 88, 0.15);
+        }
+
+        .status-fail {
+            background: var(--fail-bg);
+            color: var(--fail-color);
+            border: 1px solid rgba(255, 45, 85, 0.3);
+            box-shadow: 0 0 20px rgba(255, 45, 85, 0.15);
+        }
+
+        .status-icon { font-size: 16px; }
+
+        /* ===== SECTION ===== */
+        .section {
+            margin-bottom: 32px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-icon {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-sm);
+            font-size: 20px;
+        }
+
+        .section-icon-secrets { background: rgba(255, 45, 85, 0.12); }
+        .section-icon-sast { background: rgba(0, 212, 255, 0.12); }
+        .section-icon-deps { background: rgba(108, 99, 255, 0.12); }
+        .section-icon-container { background: rgba(255, 149, 0, 0.12); }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .section-tool {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        /* ===== CARDS ===== */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-card);
+            padding: 24px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(12px);
+        }
+
+        /* ===== EXECUTIVE SUMMARY GRID ===== */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .summary-stat {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 24px;
+            text-align: center;
+            box-shadow: var(--shadow-card);
+            transition: border-color 0.2s;
+        }
+
+        .summary-stat:hover {
+            border-color: var(--border-glow);
+        }
+
+        .stat-number {
+            font-size: 42px;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+        }
+
+        .stat-critical .stat-number { color: var(--severity-critical); }
+        .stat-high .stat-number { color: var(--severity-high); }
+        .stat-medium .stat-number { color: var(--severity-medium); }
+        .stat-low .stat-number { color: var(--severity-low); }
+        .stat-total .stat-number { color: var(--accent-cyan); }
+
+        /* ===== SEVERITY BAR CHART ===== */
+        .severity-chart {
+            margin: 24px 0;
+        }
+
+        .chart-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .chart-label {
+            width: 80px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .chart-bar-track {
+            flex: 1;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .chart-bar-fill {
+            height: 100%;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            padding-left: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            color: white;
+            min-width: fit-content;
+            transition: width 0.6s ease;
+        }
+
+        .chart-bar-critical { background: linear-gradient(90deg, var(--severity-critical), #ff4575); }
+        .chart-bar-high { background: linear-gradient(90deg, var(--severity-high), #ffb340); }
+        .chart-bar-medium { background: linear-gradient(90deg, var(--severity-medium), #f7d76e); }
+        .chart-bar-low { background: linear-gradient(90deg, var(--severity-low), #5ce882); }
+
+        .chart-count {
+            width: 40px;
+            font-size: 14px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            flex-shrink: 0;
+        }
+
+        /* ===== FINDINGS TABLE ===== */
+        .findings-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 13px;
+        }
+
+        .findings-table thead th {
+            background: rgba(0, 0, 0, 0.4);
+            color: var(--text-muted);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .findings-table thead th:first-child { border-radius: 8px 0 0 0; }
+        .findings-table thead th:last-child { border-radius: 0 8px 0 0; }
+
+        .findings-table tbody tr {
+            transition: background 0.15s;
+        }
+
+        .findings-table tbody tr:hover {
+            background: rgba(0, 212, 255, 0.04);
+        }
+
+        .findings-table tbody td {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            vertical-align: top;
+        }
+
+        .findings-table tbody tr:last-child td { border-bottom: none; }
+
+        /* ===== SEVERITY PILL ===== */
+        .severity-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 50px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .pill-critical {
+            background: var(--severity-critical-bg);
+            color: var(--severity-critical);
+            border: 1px solid rgba(255, 45, 85, 0.25);
+        }
+
+        .pill-high {
+            background: var(--severity-high-bg);
+            color: var(--severity-high);
+            border: 1px solid rgba(255, 149, 0, 0.25);
+        }
+
+        .pill-medium {
+            background: var(--severity-medium-bg);
+            color: var(--severity-medium);
+            border: 1px solid rgba(245, 197, 66, 0.25);
+        }
+
+        .pill-low {
+            background: var(--severity-low-bg);
+            color: var(--severity-low);
+            border: 1px solid rgba(48, 209, 88, 0.25);
+        }
+
+        /* ===== NO FINDINGS STATE ===== */
+        .no-findings {
+            text-align: center;
+            padding: 40px 24px;
+            color: var(--pass-color);
+        }
+
+        .no-findings-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .no-findings-text {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .no-findings-sub {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* ===== SCAN STATUS INDICATOR ===== */
+        .scan-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 14px;
+            border-radius: 50px;
+            font-size: 11px;
+            font-weight: 600;
+            float: right;
+        }
+
+        .scan-passed {
+            background: var(--pass-bg);
+            color: var(--pass-color);
+            border: 1px solid rgba(48, 209, 88, 0.2);
+        }
+
+        .scan-failed {
+            background: var(--fail-bg);
+            color: var(--fail-color);
+            border: 1px solid rgba(255, 45, 85, 0.2);
+        }
+
+        .scan-skipped {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* ===== CVE LINK ===== */
+        .cve-link {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            border-bottom: 1px dashed rgba(0, 212, 255, 0.3);
+            transition: border-color 0.2s;
+        }
+
+        .cve-link:hover {
+            border-color: var(--accent-cyan);
+        }
+
+        .mono {
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+
+        /* ===== FOOTER ===== */
+        .report-footer {
+            text-align: center;
+            padding: 32px 24px;
+            margin-top: 48px;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .footer-diamond {
+            color: var(--accent-cyan);
+            font-size: 16px;
+        }
+
+        .footer-links {
+            margin-top: 8px;
+        }
+
+        .footer-links a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            font-size: 12px;
+            margin: 0 12px;
+        }
+
+        .footer-links a:hover { text-decoration: underline; }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .container { padding: 20px 12px; }
+            .report-header { padding: 32px 20px; }
+            .report-subtitle { font-size: 22px; }
+            .metadata-bar { gap: 12px; }
+            .summary-grid { grid-template-columns: repeat(2, 1fr); }
+            .stat-number { font-size: 32px; }
+            .findings-table { font-size: 11px; }
+            .findings-table thead th,
+            .findings-table tbody td { padding: 8px 10px; }
+        }
+
+        /* ===== PRINT STYLES ===== */
+        @media print {
+            body { background: #fff; color: #1a1a1a; }
+            body::before { display: none; }
+            .card, .report-header, .summary-stat {
+                background: #fff;
+                box-shadow: none;
+                border: 1px solid #ddd;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .stat-number, .section-title, .report-subtitle {
+                -webkit-text-fill-color: initial;
+                background: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- ===== REPORT HEADER ===== -->
+        <header class="report-header">
+            <div class="logo-container">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100" width="300" height="75">
+                    <defs>
+                        <linearGradient id="dg" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#00d4ff" />
+                            <stop offset="50%" style="stop-color:#0088cc" />
+                            <stop offset="100%" style="stop-color:#6c63ff" />
+                        </linearGradient>
+                        <filter id="gl"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                    </defs>
+                    <g transform="translate(50,50)" filter="url(#gl)">
+                        <polygon points="0,-30 25,0 0,30 -25,0" fill="url(#dg)" opacity="0.9"/>
+                        <polygon points="0,-18 15,0 0,18 -15,0" fill="none" stroke="#fff" stroke-width="1" opacity="0.4"/>
+                        <circle cx="0" cy="0" r="3" fill="#fff" opacity="0.8"/>
+                    </g>
+                    <text x="90" y="42" font-family="Inter,-apple-system,sans-serif" font-size="32" font-weight="700" fill="#e6f1ff" letter-spacing="1">Consistium</text>
+                    <text x="90" y="64" font-family="Inter,-apple-system,sans-serif" font-size="11" font-weight="400" fill="#8892b0" letter-spacing="3">ATOMIC HABIT TRACKER</text>
+                </svg>
+            </div>
+            <p class="report-title">DevSecOps Pipeline</p>
+            <h1 class="report-subtitle">Security Scan Report</h1>
+
+            <div class="metadata-bar">
+                <div class="meta-item">
+                    <span class="meta-label">Date</span>
+                    <span class="meta-value">{{REPORT_DATE}}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Commit</span>
+                    <span class="meta-value">{{COMMIT_SHA}}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Branch</span>
+                    <span class="meta-value">{{BRANCH_NAME}}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Run</span>
+                    <span class="meta-value">#{{RUN_NUMBER}}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Trigger</span>
+                    <span class="meta-value">{{TRIGGER_EVENT}}</span>
+                </div>
+            </div>
+
+            <div class="status-badge {{OVERALL_STATUS_CLASS}}">
+                <span class="status-icon">{{OVERALL_STATUS_ICON}}</span>
+                {{OVERALL_STATUS_TEXT}}
+            </div>
+        </header>
+
+        <!-- ===== EXECUTIVE SUMMARY ===== -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-icon" style="background: rgba(0, 212, 255, 0.12);">📊</div>
+                <div>
+                    <h2 class="section-title">Executive Summary</h2>
+                    <p class="section-tool">Aggregated findings across all security scanners</p>
+                </div>
+            </div>
+
+            <div class="summary-grid">
+                <div class="summary-stat stat-total">
+                    <div class="stat-number">{{TOTAL_FINDINGS}}</div>
+                    <div class="stat-label">Total Findings</div>
+                </div>
+                <div class="summary-stat stat-critical">
+                    <div class="stat-number">{{CRITICAL_COUNT}}</div>
+                    <div class="stat-label">Critical</div>
+                </div>
+                <div class="summary-stat stat-high">
+                    <div class="stat-number">{{HIGH_COUNT}}</div>
+                    <div class="stat-label">High</div>
+                </div>
+                <div class="summary-stat stat-medium">
+                    <div class="stat-number">{{MEDIUM_COUNT}}</div>
+                    <div class="stat-label">Medium</div>
+                </div>
+                <div class="summary-stat stat-low">
+                    <div class="stat-number">{{LOW_COUNT}}</div>
+                    <div class="stat-label">Low</div>
+                </div>
+            </div>
+
+            <!-- Severity Breakdown Bar Chart -->
+            <div class="card">
+                <h3 style="font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px;">Severity Distribution</h3>
+                <div class="severity-chart">
+                    <div class="chart-row">
+                        <span class="chart-label" style="color: var(--severity-critical);">Critical</span>
+                        <div class="chart-bar-track">
+                            <div class="chart-bar-fill chart-bar-critical" style="width: {{CRITICAL_PCT}}%;">{{CRITICAL_BAR_LABEL}}</div>
+                        </div>
+                        <span class="chart-count" style="color: var(--severity-critical);">{{CRITICAL_COUNT}}</span>
+                    </div>
+                    <div class="chart-row">
+                        <span class="chart-label" style="color: var(--severity-high);">High</span>
+                        <div class="chart-bar-track">
+                            <div class="chart-bar-fill chart-bar-high" style="width: {{HIGH_PCT}}%;">{{HIGH_BAR_LABEL}}</div>
+                        </div>
+                        <span class="chart-count" style="color: var(--severity-high);">{{HIGH_COUNT}}</span>
+                    </div>
+                    <div class="chart-row">
+                        <span class="chart-label" style="color: var(--severity-medium);">Medium</span>
+                        <div class="chart-bar-track">
+                            <div class="chart-bar-fill chart-bar-medium" style="width: {{MEDIUM_PCT}}%;">{{MEDIUM_BAR_LABEL}}</div>
+                        </div>
+                        <span class="chart-count" style="color: var(--severity-medium);">{{MEDIUM_COUNT}}</span>
+                    </div>
+                    <div class="chart-row">
+                        <span class="chart-label" style="color: var(--severity-low);">Low</span>
+                        <div class="chart-bar-track">
+                            <div class="chart-bar-fill chart-bar-low" style="width: {{LOW_PCT}}%;">{{LOW_BAR_LABEL}}</div>
+                        </div>
+                        <span class="chart-count" style="color: var(--severity-low);">{{LOW_COUNT}}</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== SECRET SCANNING ===== -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-icon section-icon-secrets">🔑</div>
+                <div>
+                    <h2 class="section-title">Secret Scanning</h2>
+                    <p class="section-tool">TruffleHog — Full git history scan</p>
+                </div>
+                <span class="scan-status {{SECRET_SCAN_STATUS_CLASS}}">{{SECRET_SCAN_STATUS_ICON}} {{SECRET_SCAN_STATUS}}</span>
+            </div>
+            <div class="card">
+                {{SECRET_SCAN_CONTENT}}
+            </div>
+        </section>
+
+        <!-- ===== SAST ANALYSIS ===== -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-icon section-icon-sast">🔍</div>
+                <div>
+                    <h2 class="section-title">Static Analysis (SAST)</h2>
+                    <p class="section-tool">GitHub CodeQL — JavaScript source analysis</p>
+                </div>
+                <span class="scan-status {{SAST_SCAN_STATUS_CLASS}}">{{SAST_SCAN_STATUS_ICON}} {{SAST_SCAN_STATUS}}</span>
+            </div>
+            <div class="card">
+                {{SAST_SCAN_CONTENT}}
+            </div>
+        </section>
+
+        <!-- ===== DEPENDENCY SCAN ===== -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-icon section-icon-deps">🛡️</div>
+                <div>
+                    <h2 class="section-title">Dependency Scan</h2>
+                    <p class="section-tool">Trivy — Filesystem vulnerability scan</p>
+                </div>
+                <span class="scan-status {{TRIVY_FS_STATUS_CLASS}}">{{TRIVY_FS_STATUS_ICON}} {{TRIVY_FS_STATUS}}</span>
+            </div>
+            <div class="card">
+                {{TRIVY_FS_CONTENT}}
+            </div>
+        </section>
+
+        <!-- ===== CONTAINER SCAN ===== -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-icon section-icon-container">🐳</div>
+                <div>
+                    <h2 class="section-title">Container Image Scan</h2>
+                    <p class="section-tool">Trivy — Docker image vulnerability scan</p>
+                </div>
+                <span class="scan-status {{TRIVY_IMAGE_STATUS_CLASS}}">{{TRIVY_IMAGE_STATUS_ICON}} {{TRIVY_IMAGE_STATUS}}</span>
+            </div>
+            <div class="card">
+                {{TRIVY_IMAGE_CONTENT}}
+            </div>
+        </section>
+
+        <!-- ===== FOOTER ===== -->
+        <footer class="report-footer">
+            <div class="footer-brand">
+                <span class="footer-diamond">◆</span>
+                Consistium DevSecOps Pipeline
+            </div>
+            <p>Report generated on {{REPORT_DATETIME}} UTC</p>
+            <p>Pipeline run <a href="{{RUN_URL}}" style="color: var(--accent-cyan);">#{{RUN_NUMBER}}</a></p>
+            <div class="footer-links">
+                <a href="{{REPO_URL}}">Repository</a>
+                <a href="{{REPO_URL}}/security">Security Tab</a>
+                <a href="{{REPO_URL}}/actions">Actions</a>
+            </div>
+            <p style="margin-top: 16px; font-size: 11px; color: var(--text-muted);">
+                This report was automatically generated by the Consistium DevSecOps pipeline.<br>
+                Tools: TruffleHog • GitHub CodeQL • Aqua Trivy
+            </p>
+        </footer>
+
+    </div>
+</body>
+</html>

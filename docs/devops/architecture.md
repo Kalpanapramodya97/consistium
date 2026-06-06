@@ -238,9 +238,10 @@ A dedicated DevSecOps pipeline (`devsecops.yml`) runs automatically on every pus
 | **secret-scan** | TruffleHog | Scans full Git history for leaked secrets, API keys, and credentials |
 | **codeql-sast** | CodeQL (JavaScript) | Static Application Security Testing — identifies code-level vulnerabilities |
 | **trivy-scan** | Trivy | Filesystem scan for dependency vulnerabilities + Docker image scan for OS-level CVEs |
+| **security-report** | Custom Generator + Gmail SMTP | Aggregates all scan results into a branded HTML report and emails it as an attachment |
 
 > [!IMPORTANT]
-> The weekly cron trigger ensures that even without code changes, the project is continuously evaluated against the latest vulnerability databases. For detailed security scan configurations and remediation workflows, refer to the dedicated DevSecOps documentation.
+> The weekly cron trigger ensures that even without code changes, the project is continuously evaluated against the latest vulnerability databases. After each run, a branded security report is automatically generated and emailed to the project maintainer. For detailed security scan configurations and remediation workflows, refer to the dedicated DevSecOps documentation.
 
 ---
 
@@ -310,6 +311,8 @@ graph LR
 | **TruffleHog** | Latest | Security | Git history secret scanning |
 | **CodeQL** | Latest | Security | Static Application Security Testing (JavaScript) |
 | **Trivy** | Latest | Security | Filesystem and container image vulnerability scanning |
+| **Security Report Generator** | Custom | Security | Aggregates scan results into branded HTML security report |
+| **action-send-mail** | v3 | Notification | Delivers security reports via Gmail SMTP |
 | **Helm** | v3.12+ | Orchestration | Kubernetes package management with templated manifests |
 | **Kubernetes** | v1.27+ | Orchestration | Container orchestration with Deployment, HPA, PDB, NetworkPolicy |
 | **Loki** | 2.9.2 | Observability | Log aggregation, storage, and querying via LogQL |

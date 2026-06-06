@@ -362,7 +362,205 @@ This prevents developers from being blocked by issues they cannot resolve, while
 
 ---
 
-## Future Enhancements
+## Job 4: Security Report Generation & Email Notification
+
+**Job name:** `security-report`
+**Tools:** Custom HTML generator + [`dawidd6/action-send-mail@v3`](https://github.com/dawidd6/action-send-mail)
+
+### What It Does
+
+The `security-report` job is the **aggregation and communication layer** of the DevSecOps pipeline. It collects scan outputs from all three upstream jobs, generates a branded HTML security report, and delivers it via email.
+
+This pattern is used by major enterprises for **audit compliance**, **stakeholder visibility**, and **security documentation**:
+
+| Company / Framework | Approach |
+|---|---|
+| **Google** | Binary Authorization + centralized security dashboards |
+| **Microsoft** | SARIF-based reporting with branded compliance docs |
+| **Netflix** | Centralized vulnerability management with aggregated dashboards |
+| **OWASP SAMM** | Recommends automated report generation (Verification practice) |
+| **SOC 2 / ISO 27001** | Requires documented evidence of security scanning |
+
+### How It Works
+
+```mermaid
+flowchart TD
+    A["secret-scan\n(TruffleHog JSON)"] --> D["security-report"]
+    B["codeql-sast\n(SARIF)"] --> D
+    C["trivy-scan\n(JSON × 2)"] --> D
+
+    D --> E["Download all\nscan artifacts"]
+    E --> F["Run generate-report.sh\n(jq + Python3)"]
+    F --> G["Branded HTML Report\nconsistium-security-report.html"]
+
+    G --> H["Upload as\nGitHub Artifact"]
+    G --> I["📧 Email to\nkalpanapramodya97@gmail.com"]
+
+    style D fill:#0d1b2a,stroke:#00d4ff,color:#fff,stroke-width:2px
+    style G fill:#1b263b,stroke:#00d4ff,color:#fff
+    style H fill:#2d6a4f,stroke:#2d6a4f,color:#fff
+    style I fill:#1a1a2e,stroke:#f59e0b,color:#fff
+```
+
+1. **Artifact collection** — Downloads JSON/SARIF outputs from all three scan jobs using `actions/download-artifact@v4`
+2. **Report generation** — Runs [`security/generate-report.sh`](../../security/generate-report.sh) which:
+   - Parses TruffleHog JSON for leaked secrets
+   - Parses CodeQL SARIF for static analysis findings
+   - Parses Trivy JSON for dependency and container vulnerabilities
+   - Calculates severity statistics and percentages
+   - Injects data into the branded HTML template
+3. **Artifact upload** — Uploads the final HTML report as a downloadable GitHub Actions artifact (90-day retention)
+4. **Email delivery** — Sends the report as an email attachment via Gmail SMTP
+
+### Report Contents
+
+The generated HTML report includes:
+
+| Section | Contents |
+|---|---|
+| **Header** | Consistium logo, "Security Scan Report" title, pipeline metadata |
+| **Metadata Bar** | Date, commit SHA, branch, run number, trigger type |
+| **Executive Summary** | Total findings count, breakdown by severity (CRITICAL/HIGH/MEDIUM/LOW) |
+| **Severity Chart** | CSS-only horizontal bar chart showing severity distribution |
+| **🔑 Secret Scanning** | TruffleHog findings table or "No issues detected" |
+| **🔍 SAST Analysis** | CodeQL findings with CWE references or "No issues detected" |
+| **🛡️ Dependency Scan** | Trivy FS CVE table (package, version, fix, severity) |
+| **🐳 Container Scan** | Trivy image CVE table (OS-level vulnerabilities) |
+| **Footer** | Generation timestamp, pipeline link, repository links |
+
+The report is **fully self-contained** — all CSS is inline, the logo is an embedded SVG, and no external resources are loaded. It renders correctly when downloaded and opened in any browser.
+
+### Configuration Explained
+
+```yaml
+security-report:
+  name: Generate Security Report
+  runs-on: ubuntu-latest
+  needs: [secret-scan, codeql-sast, trivy-scan]
+  if: always()
+  steps:
+    # 1. Download all scan artifacts
+    - uses: actions/download-artifact@v4
+      with:
+        name: trufflehog-results
+      continue-on-error: true     # Generate report even if a scan failed
+
+    # 2. Generate the branded HTML report
+    - run: bash security/generate-report.sh --trufflehog ... --output report.html
+
+    # 3. Upload as downloadable artifact
+    - uses: actions/upload-artifact@v4
+      with:
+        name: consistium-security-report
+        path: consistium-security-report.html
+
+    # 4. Email the report
+    - uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        to: kalpanapramodya97@gmail.com
+        attachments: consistium-security-report.html
+```
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| `needs: [secret-scan, codeql-sast, trivy-scan]` | All three jobs | Ensures all scan data is available before report generation |
+| `if: always()` | Runs unconditionally | Report documents failures and skipped scans too |
+| `continue-on-error: true` | On artifact downloads | Missing scan results are shown as "Skipped" rather than crashing |
+| `retention-days: 90` | 90-day retention | Provides sufficient audit trail for compliance |
+
+### Email Notification
+
+The report is automatically emailed as an attachment after every pipeline run.
+
+| Feature | Details |
+|---|---|
+| **SMTP Server** | `smtp.gmail.com:465` (SSL) |
+| **From** | `Consistium DevSecOps <kalpanapramodya97@gmail.com>` |
+| **To** | `kalpanapramodya97@gmail.com` |
+| **Subject** | `🛡️ Consistium Security Report — {branch} — Run #{number}` |
+| **Body** | Pipeline metadata + link to GitHub Actions run |
+| **Attachment** | `consistium-security-report.html` |
+
+#### Required GitHub Secrets
+
+Two repository secrets must be configured for email delivery:
+
+| Secret Name | Value |
+|---|---|
+| `MAIL_USERNAME` | `kalpanapramodya97@gmail.com` |
+| `MAIL_PASSWORD` | Gmail App Password (16-character code) |
+
+> [!IMPORTANT]
+> The `MAIL_PASSWORD` must be a **Gmail App Password**, not your regular Gmail password. Generate one at: Google Account → Security → 2-Step Verification → App passwords.
+
+### Report Template Architecture
+
+The report template system consists of two files in the [`security/`](../../security/) directory:
+
+| File | Purpose |
+|---|---|
+| [`report-template.html`](../../security/report-template.html) | HTML template with `{{PLACEHOLDER}}` variables and inline CSS |
+| [`generate-report.sh`](../../security/generate-report.sh) | Bash script that parses scan outputs and populates the template |
+
+The template uses a dark theme matching the Consistium app aesthetic — dark background, cyan/purple accent colors, glassmorphism cards, and the Inter font family.
+
+### How to Download Reports
+
+1. Go to **Actions** → Select a **DevSecOps Pipeline** run
+2. Scroll to the **Artifacts** section at the bottom
+3. Click **consistium-security-report** to download
+4. Open the `.html` file in any web browser
+
+Alternatively, check your email — the report is automatically sent as an attachment after every run.
+
+---
+
+## Updated Pipeline Overview
+
+With the addition of the security report job, the complete DevSecOps pipeline now consists of **four jobs**:
+
+```mermaid
+flowchart TD
+    A["Trigger: Push / PR / Weekly Cron"] --> B{"DevSecOps Pipeline"}
+
+    B --> C["🔑 Job 1: secret-scan\n(TruffleHog)"]
+    B --> D["🔍 Job 2: codeql-sast\n(GitHub CodeQL)"]
+    B --> E["🛡️ Job 3: trivy-scan\n(Aqua Trivy)"]
+
+    C --> C1["JSON artifact"]
+    D --> D1["SARIF artifact"]
+    E --> E1["JSON artifacts × 2"]
+
+    C1 --> F["📊 Job 4: security-report\n(Report Generator)"]
+    D1 --> F
+    E1 --> F
+
+    F --> G["📄 Branded HTML Report"]
+    F --> H["📧 Email Notification"]
+
+    C --> C2{{"Verified secrets?"}}
+    C2 -- Yes --> C3["❌ Fail"]
+    C2 -- No --> C4["✅ Pass"]
+
+    D --> D2{{"Code issues?"}}
+    D2 -- Yes --> D3["⚠️ Security tab"]
+    D2 -- No --> D4["✅ Pass"]
+
+    E --> E2{{"FS: CRITICAL/HIGH?"}}
+    E2 -- Yes --> E3["❌ Fail"]
+    E2 -- No --> E4["Image scan\n(report only)"]
+
+    style C fill:#1a1a2e,stroke:#e94560,color:#fff
+    style D fill:#1a1a2e,stroke:#0f3460,color:#fff
+    style E fill:#1a1a2e,stroke:#16213e,color:#fff
+    style F fill:#0d1b2a,stroke:#00d4ff,color:#fff,stroke-width:2px
+    style G fill:#2d6a4f,stroke:#2d6a4f,color:#fff
+    style H fill:#1a1a2e,stroke:#f59e0b,color:#fff
+```
+
+---
+
 
 The current pipeline provides strong foundational coverage across secrets, source code, dependencies, and containers. The following enhancements would extend the security posture further:
 
