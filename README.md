@@ -150,9 +150,9 @@ See [Kubernetes Deployment Guide](docs/devops/kubernetes.md) for full details.
 </p>
 
 ### DevSecOps & Security
-<p align="center">
-  <img width="800" alt="DevSecOps Security Report" src="assets/security-report.png" />
-</p>
+
+<img width="1307" height="882" alt="image" src="https://github.com/user-attachments/assets/ce746aa5-c716-4158-8d4a-6806ace3fefe" />
+
 
 ## 📄 License
 
