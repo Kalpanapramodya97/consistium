@@ -109,9 +109,30 @@ jobs:
           default_bump: patch
           release_branches: "main,master"
 
+      - name: Generate Release Document
+        env:
+          CHANGELOG: ${{ steps.tag_version.outputs.changelog }}
+          VERSION: ${{ steps.tag_version.outputs.new_tag }}
+        run: |
+          echo "# Release Document - $VERSION" > RELEASE_DOCUMENT.md
+          echo "Date: $(date +'%Y-%m-%d')" >> RELEASE_DOCUMENT.md
+          echo "" >> RELEASE_DOCUMENT.md
+          echo "## Changes" >> RELEASE_DOCUMENT.md
+          echo "$CHANGELOG" >> RELEASE_DOCUMENT.md
+          echo "" >> RELEASE_DOCUMENT.md
+          echo "**Commit:** ${{ github.sha }}" >> RELEASE_DOCUMENT.md
+
+      - name: Upload Release Document Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-document-${{ steps.tag_version.outputs.new_tag }}
+          path: RELEASE_DOCUMENT.md
+          retention-days: 90
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
           name: Release ${{ steps.tag_version.outputs.new_tag }}
-          generate_release_notes: true
+          body_path: RELEASE_DOCUMENT.md
+          files: RELEASE_DOCUMENT.md
