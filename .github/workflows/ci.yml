@@ -114,6 +114,7 @@ jobs:
           CHANGELOG: ${{ steps.tag_version.outputs.changelog }}
           VERSION: ${{ steps.tag_version.outputs.new_tag }}
         run: |
+          # Markdown version for GitHub Release
           echo "# Release Document - $VERSION" > RELEASE_DOCUMENT.md
           echo "Date: $(date +'%Y-%m-%d')" >> RELEASE_DOCUMENT.md
           echo "" >> RELEASE_DOCUMENT.md
@@ -121,12 +122,44 @@ jobs:
           echo "$CHANGELOG" >> RELEASE_DOCUMENT.md
           echo "" >> RELEASE_DOCUMENT.md
           echo "**Commit:** ${{ github.sha }}" >> RELEASE_DOCUMENT.md
+          
+          # Colorful HTML version for Email
+          cat <<EOF > RELEASE_DOCUMENT.html
+          <!DOCTYPE html>
+          <html>
+          <head>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+            .container { max-width: 800px; margin: auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-top: 5px solid #e74c3c; }
+            h1 { color: #2c3e50; }
+            .version { background: #e74c3c; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.8em; vertical-align: middle; }
+            .meta { color: #7f8c8d; font-size: 0.9em; margin-bottom: 20px; }
+            .changes { background: #2c3e50; color: #ecf0f1; padding: 20px; border-radius: 8px; margin-top: 20px; white-space: pre-wrap; font-family: Consolas, monospace; line-height: 1.5; }
+            .footer { margin-top: 30px; text-align: center; color: #95a5a6; font-size: 0.8em; border-top: 1px solid #eee; padding-top: 20px; }
+          </style>
+          </head>
+          <body>
+          <div class="container">
+            <h1>🚀 Consistium Release <span class="version">$VERSION</span></h1>
+            <div class="meta">
+              <strong>Date:</strong> $(date +'%Y-%m-%d')<br>
+              <strong>Commit:</strong> <code>${{ github.sha }}</code>
+            </div>
+            <h2>✨ What's New</h2>
+            <div class="changes">${CHANGELOG}</div>
+            <div class="footer">Consistium CI/CD Pipeline &bull; 1% better every day</div>
+          </div>
+          </body>
+          </html>
+          EOF
 
       - name: Upload Release Document Artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-document-${{ steps.tag_version.outputs.new_tag }}
-          path: RELEASE_DOCUMENT.md
+          path: |
+            RELEASE_DOCUMENT.md
+            RELEASE_DOCUMENT.html
           retention-days: 90
 
       - name: Create GitHub Release
@@ -136,3 +169,25 @@ jobs:
           name: Release ${{ steps.tag_version.outputs.new_tag }}
           body_path: RELEASE_DOCUMENT.md
           files: RELEASE_DOCUMENT.md
+
+      - name: Send Release Document via Email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "🚀 Consistium New Release: ${{ steps.tag_version.outputs.new_tag }}"
+          to: kalpanapramodya97@gmail.com
+          from: Consistium Release <kalpanapramodya97@gmail.com>
+          body: |
+            A new release (${{ steps.tag_version.outputs.new_tag }}) has been created for Consistium!
+            
+            The colorful release document detailing all the changes is attached to this email.
+            
+            🔗 View the release on GitHub:
+            ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.tag_version.outputs.new_tag }}
+            
+            ◆ Consistium — 1% better every day
+          attachments: RELEASE_DOCUMENT.html
