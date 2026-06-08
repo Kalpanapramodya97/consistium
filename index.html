@@ -37,6 +37,12 @@
           <span class="streak-count" id="streakCount">0</span>
           <span class="streak-label">day streak</span>
         </div>
+        <button class="btn-icon" id="adminBtn" title="Admin Dashboard" aria-label="Admin Dashboard" style="display: none;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </button>
+        <button class="btn-icon" id="authBtn" title="Login / Register" aria-label="Login / Register">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
         <button class="btn-icon" id="aiAdvisorToggle" title="AI Advisor" aria-label="Toggle AI Advisor">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10a7 7 0 0 1-14 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg>
         </button>
@@ -332,6 +338,79 @@
         <div class="setting-row setting-danger">
           <span>Reset All Data</span>
           <button class="btn btn-danger btn-sm" id="resetBtn">Reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auth Modal -->
+  <div class="modal-overlay" id="authModal" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="authModalTitle">Login</h3>
+        <button class="btn-icon modal-close" id="authCloseBtn" aria-label="Close Auth">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="authForm">
+        <div class="form-group" id="authNameGroup" style="display: none;">
+          <label for="authName">Name</label>
+          <input type="text" id="authName" placeholder="Your Name" />
+        </div>
+        <div class="form-group">
+          <label for="authEmail">Email</label>
+          <input type="email" id="authEmail" placeholder="you@example.com" required autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label for="authPassword">Password</label>
+          <input type="password" id="authPassword" placeholder="••••••••" required />
+        </div>
+        <p class="auth-error" id="authError" style="color: var(--danger); font-size: 0.9em; display: none;"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="authToggleModeBtn">Need an account? Register</button>
+          <button type="submit" class="btn btn-primary" id="authSubmitBtn">Login</button>
+        </div>
+      </form>
+      <!-- User Info View (shown when logged in) -->
+      <div id="authProfileView" style="display: none;">
+        <p><strong>Name:</strong> <span id="profileName"></span></p>
+        <p><strong>Email:</strong> <span id="profileEmail"></span></p>
+        <div class="modal-actions" style="margin-top: 20px;">
+          <button type="button" class="btn btn-danger" id="logoutBtn">Logout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Dashboard Modal -->
+  <div class="modal-overlay" id="adminModal" style="display: none;">
+    <div class="modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Admin Dashboard</h3>
+        <button class="btn-icon modal-close" id="adminCloseBtn" aria-label="Close Admin">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="settings-body">
+        <h4>System Stats</h4>
+        <div class="stats-grid" style="margin-bottom: 20px;">
+          <div class="stat-card">
+            <span class="stat-value" id="adminTotalUsers">0</span>
+            <span class="stat-label">Total Users</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="adminTotalHabits">0</span>
+            <span class="stat-label">Total Habits</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="adminTotalCompletions">0</span>
+            <span class="stat-label">Total Completions</span>
+          </div>
+        </div>
+        
+        <h4>User Management</h4>
+        <div id="adminUserList" style="max-height: 300px; overflow-y: auto;">
+          <!-- Users injected here -->
         </div>
       </div>
     </div>

@@ -45,6 +45,11 @@
 - **Special Tasks** — Add one-off daily tasks that do not repeat but contribute to your daily score.
 - **Full CRUD** — Easily Add, Edit, or Delete habits with a built-in emoji picker.
 
+### 👥 Multi-User & Admin Panel
+- **User Accounts** — Secure user registration and login with JWT authentication, backed by a Node.js/Express API and MongoDB.
+- **Admin Dashboard** — The first registered user automatically becomes an admin. Access the admin panel to view system-wide statistics (total users, habits, completions) and manage/delete users.
+- **Optimistic Sync** — The app falls back gracefully to `localStorage` when offline, and automatically syncs data with the backend when you are logged in.
+
 ### 📊 Gamification & Insights
 - **Score Ring** — Visual progress indicator with an animated percentage completion.
 - **Streak Counter** — Track consecutive perfect days to maintain momentum.
@@ -55,7 +60,6 @@
 - **🌗 Light & Dark Theme** — One-click dark mode toggle that automatically respects your OS colour-scheme preference.
 - **150+ Curated Quotes** — Motivational quotes from *Atomic Habits*, *Deep Work*, *Mindset*, and *Wild Courage*. Browse them or let them auto-rotate every 5 minutes.
 - **Keyboard Navigation** — Seamlessly navigate between days using the `←` and `→` arrow keys.
-- **Local Persistence** — Zero tracking, zero accounts. All data is securely saved in your browser's `localStorage`.
 - **Import / Export** — Full JSON backup and restore capabilities.
 
 ---
@@ -65,7 +69,7 @@
 Consistium is designed to be completely flexible. Run it locally with zero dependencies, or deploy it to a Kubernetes cluster.
 
 ### 📦 Option 1: Static File (No Installation)
-Because the app is built with Vanilla JS, you can simply clone and run it directly in your browser.
+Because the app is built with Vanilla JS, you can simply clone and run it directly in your browser. (Note: Multi-user sync features require the backend, but local mode works perfectly!)
 ```bash
 git clone https://github.com/Kalpanapramodya97/consistium.git
 cd consistium
@@ -73,11 +77,23 @@ open index.html  # Windows: start index.html
 ```
 
 ### 🐳 Option 2: Docker Compose (Local Build)
-Run with Docker Compose for a production-ready Nginx setup. This builds the image locally.
+Run with Docker Compose for a production-ready Nginx setup, Node.js Backend, MongoDB database, and a full observability stack.
 ```bash
 docker compose up -d
-# 🔗 Access at http://localhost:3000
 ```
+
+#### 🔗 Accessing the Applications
+
+Once the containers are running, you can access the various services at the following URLs:
+
+| Service | Access URL | Credentials (if applicable) | Description |
+|:---|:---|:---|:---|
+| **Consistium App** | [http://localhost:3000](http://localhost:3000) | Register to create account | Main frontend application (Nginx). First user becomes Admin. |
+| **Backend API** | [http://localhost:5000/api/health](http://localhost:5000/api/health) | N/A | Node.js Express API Healthcheck (also proxied via frontend). |
+| **Grafana** | [http://localhost:3001](http://localhost:3001) | User: `admin`, Pass: `admin` | Observability UI for metrics (Prometheus) and logs (Loki). |
+| **Prometheus** | [http://localhost:9090](http://localhost:9090) | N/A | Time-series database scraping Nginx metrics. |
+| **Loki** | `http://localhost:3100` | N/A | Log aggregation API (No Web UI - view logs inside Grafana). |
+| **MongoDB** | `mongodb://localhost:27017` | N/A | Database connection string (No Web UI - connect via MongoDB Compass). |
 
 ### ☁️ Option 3: Pre-built Docker Image (GHCR)
 Run the pre-built image directly from the GitHub Container Registry. No cloning required!

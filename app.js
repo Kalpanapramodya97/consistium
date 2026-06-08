@@ -123,6 +123,28 @@
     importFile: $('#importFile'),
     resetBtn: $('#resetBtn'),
     scoreRing: $('#scoreRing'),
+    // Auth & Admin
+    authBtn: $('#authBtn'),
+    adminBtn: $('#adminBtn'),
+    authModal: $('#authModal'),
+    authCloseBtn: $('#authCloseBtn'),
+    authForm: $('#authForm'),
+    authNameGroup: $('#authNameGroup'),
+    authName: $('#authName'),
+    authEmail: $('#authEmail'),
+    authPassword: $('#authPassword'),
+    authError: $('#authError'),
+    authToggleModeBtn: $('#authToggleModeBtn'),
+    authSubmitBtn: $('#authSubmitBtn'),
+    authModalTitle: $('#authModalTitle'),
+    authProfileView: $('#authProfileView'),
+    logoutBtn: $('#logoutBtn'),
+    adminModal: $('#adminModal'),
+    adminCloseBtn: $('#adminCloseBtn'),
+    adminTotalUsers: $('#adminTotalUsers'),
+    adminTotalHabits: $('#adminTotalHabits'),
+    adminTotalCompletions: $('#adminTotalCompletions'),
+    adminUserList: $('#adminUserList')
   };
 
   // ── Helpers ──
@@ -154,13 +176,89 @@
     return d > t;
   }
 
+  // ── Auth & API ──
+  const API_URL = '/api';
+  let authToken = localStorage.getItem('consistium_token');
+  let currentUser = null;
+
+  async function apiFetch(endpoint, options = {}) {
+    if (!options.headers) options.headers = {};
+    if (authToken) options.headers['Authorization'] = `Bearer ${authToken}`;
+    options.headers['Content-Type'] = 'application/json';
+    
+    const res = await fetch(`${API_URL}${endpoint}`, options);
+    if (!res.ok) {
+      if (res.status === 401) {
+        logout();
+      }
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'API Error');
+    }
+    return res.json();
+  }
+
+  async function syncStateFromApi() {
+    if (!authToken) return;
+    try {
+      currentUser = await apiFetch('/auth/me');
+      if (currentUser.role === 'admin') {
+        dom.adminBtn.style.display = 'flex';
+      }
+      
+      const habits = await apiFetch('/habits');
+      // For simple sync, we map API habits back to local structure
+      state.habits = habits.map(h => ({
+        id: h._id,
+        name: h.name,
+        emoji: h.emoji,
+        type: h.type,
+        isNew: h.isNewHabit
+      }));
+      
+      // We'd ideally fetch completions for all days in state, but let's fetch today's at least
+      const todayKey = dateKey(currentDate);
+      const completions = await apiFetch(`/habits/completions/${todayKey}`);
+      state.completions[todayKey] = {};
+      completions.forEach(cid => {
+        state.completions[todayKey][cid] = true;
+      });
+
+      renderAll();
+    } catch (e) {
+      console.error('Sync failed', e);
+    }
+  }
+
+  function logout() {
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('consistium_token');
+    state = { habits: DEFAULT_HABITS, completions: {}, tasks: {} };
+    dom.adminBtn.style.display = 'none';
+    renderAll();
+    updateAuthUI();
+  }
+
+  function updateAuthUI() {
+    if (authToken) {
+      dom.authProfileView.style.display = 'block';
+      dom.authForm.style.display = 'none';
+      if (currentUser) {
+        $('#profileName').textContent = currentUser.name;
+        $('#profileEmail').textContent = currentUser.email;
+      }
+    } else {
+      dom.authProfileView.style.display = 'none';
+      dom.authForm.style.display = 'block';
+    }
+  }
+
   // ── Persistence ──
   function loadState() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        // Validate structure
         if (parsed.habits && parsed.completions) {
           parsed.tasks = parsed.tasks || {};
           return parsed;
@@ -169,8 +267,8 @@
     } catch (e) { /* ignore */ }
     return {
       habits: DEFAULT_HABITS,
-      completions: {}, // { "2026-05-12": { habitId: true } }
-      tasks: {} // { "2026-05-12": [{ id, name, emoji, isCompleted }] }
+      completions: {},
+      tasks: {}
     };
   }
 
@@ -499,7 +597,7 @@
   }
 
   // ── Actions ──
-  function toggleHabit(habitId) {
+  async function toggleHabit(habitId) {
     const key = dateKey(currentDate);
     if (!state.completions[key]) state.completions[key] = {};
 
@@ -511,6 +609,17 @@
 
     saveState();
     renderAll();
+
+    if (authToken) {
+      try {
+        await apiFetch('/habits/completions', {
+          method: 'POST',
+          body: JSON.stringify({ habitId, dateKey: key })
+        });
+      } catch (e) {
+        console.error('Toggle failed API sync', e);
+      }
+    }
   }
 
   function spawnConfetti() {
@@ -583,7 +692,7 @@
     dom.habitModal.style.display = 'none';
   }
 
-  function saveHabit(e) {
+  async function saveHabit(e) {
     e.preventDefault();
     const name = dom.habitName.value.trim();
     if (!name) return;
@@ -605,26 +714,48 @@
       } else {
         state.tasks[key].push({ id: genId(), emoji, name, isCompleted: false });
       }
+      saveState();
+      closeModal();
+      renderAll();
     } else {
-      if (editId) {
-        const habit = state.habits.find(h => h.id === editId);
-        if (habit) {
-          habit.name = name;
-          habit.emoji = emoji;
-          habit.isNew = isNew;
-          habit.type = type;
+      try {
+        if (authToken) {
+          if (editId && !editId.startsWith('_')) {
+            await apiFetch(`/habits/${editId}`, {
+              method: 'PUT',
+              body: JSON.stringify({ name, emoji, type, isNewHabit: isNew })
+            });
+          } else {
+            await apiFetch('/habits', {
+              method: 'POST',
+              body: JSON.stringify({ name, emoji, type, isNewHabit: isNew })
+            });
+          }
+          await syncStateFromApi();
+        } else {
+          // Local fallback
+          if (editId) {
+            const habit = state.habits.find(h => h.id === editId);
+            if (habit) {
+              habit.name = name;
+              habit.emoji = emoji;
+              habit.isNew = isNew;
+              habit.type = type;
+            }
+          } else {
+            state.habits.push({ id: genId(), emoji, name, isNew, type });
+          }
+          saveState();
+          renderAll();
         }
-      } else {
-        state.habits.push({ id: genId(), emoji, name, isNew, type });
+        closeModal();
+      } catch (e) {
+        alert(e.message);
       }
     }
-
-    saveState();
-    closeModal();
-    renderAll();
   }
 
-  function deleteHabit() {
+  async function deleteHabit() {
     const editId = dom.habitEditId.value;
     const type = dom.habitType.value;
     if (!editId) return;
@@ -635,17 +766,28 @@
       if (state.tasks[key]) {
         state.tasks[key] = state.tasks[key].filter(t => t.id !== editId);
       }
+      saveState();
+      closeModal();
+      renderAll();
     } else {
-      state.habits = state.habits.filter(h => h.id !== editId);
-      // Clean up completions
-      Object.keys(state.completions).forEach(key => {
-        delete state.completions[key][editId];
-      });
+      if (authToken && !editId.startsWith('_')) {
+        try {
+          await apiFetch(`/habits/${editId}`, { method: 'DELETE' });
+          await syncStateFromApi();
+          closeModal();
+        } catch (e) {
+          alert(e.message);
+        }
+      } else {
+        state.habits = state.habits.filter(h => h.id !== editId);
+        Object.keys(state.completions).forEach(key => {
+          delete state.completions[key][editId];
+        });
+        saveState();
+        closeModal();
+        renderAll();
+      }
     }
-
-    saveState();
-    closeModal();
-    renderAll();
   }
 
   // ── Settings ──
@@ -774,6 +916,91 @@
     dom.importFile.addEventListener('change', handleImport);
     dom.resetBtn.addEventListener('click', resetData);
 
+    // Auth Modal
+    dom.authBtn.addEventListener('click', () => {
+      dom.authModal.style.display = 'flex';
+    });
+    dom.authCloseBtn.addEventListener('click', () => {
+      dom.authModal.style.display = 'none';
+      dom.authError.style.display = 'none';
+    });
+    let isRegisterMode = false;
+    dom.authToggleModeBtn.addEventListener('click', () => {
+      isRegisterMode = !isRegisterMode;
+      dom.authNameGroup.style.display = isRegisterMode ? 'block' : 'none';
+      dom.authModalTitle.textContent = isRegisterMode ? 'Register' : 'Login';
+      dom.authToggleModeBtn.textContent = isRegisterMode ? 'Already have an account? Login' : 'Need an account? Register';
+      dom.authSubmitBtn.textContent = isRegisterMode ? 'Register' : 'Login';
+      dom.authError.style.display = 'none';
+    });
+    dom.authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = dom.authEmail.value;
+      const password = dom.authPassword.value;
+      const name = dom.authName.value;
+      const endpoint = isRegisterMode ? '/auth/register' : '/auth/login';
+      const body = isRegisterMode ? { name, email, password } : { email, password };
+      
+      try {
+        const data = await apiFetch(endpoint, {
+          method: 'POST',
+          body: JSON.stringify(body)
+        });
+        authToken = data.token;
+        localStorage.setItem('consistium_token', authToken);
+        dom.authModal.style.display = 'none';
+        dom.authError.style.display = 'none';
+        dom.authForm.reset();
+        await syncStateFromApi();
+        updateAuthUI();
+      } catch (err) {
+        dom.authError.textContent = err.message;
+        dom.authError.style.display = 'block';
+      }
+    });
+    dom.logoutBtn.addEventListener('click', () => {
+      logout();
+      dom.authModal.style.display = 'none';
+    });
+
+    // Admin Dashboard
+    dom.adminBtn.addEventListener('click', async () => {
+      dom.adminModal.style.display = 'flex';
+      try {
+        const stats = await apiFetch('/admin/stats');
+        dom.adminTotalUsers.textContent = stats.users;
+        dom.adminTotalHabits.textContent = stats.habits;
+        dom.adminTotalCompletions.textContent = stats.completions;
+
+        const users = await apiFetch('/admin/users');
+        dom.adminUserList.innerHTML = users.map(u => `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
+            <div>
+              <strong>${u.name}</strong> (${u.email})
+              <span class="bad-badge" style="background: ${u.role === 'admin' ? 'var(--primary)' : '#666'}">${u.role}</span>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="deleteUser('${u._id}')">Delete</button>
+          </div>
+        `).join('');
+      } catch (err) {
+        dom.adminUserList.innerHTML = `<p style="color: red">Failed to load users: ${err.message}</p>`;
+      }
+    });
+    dom.adminCloseBtn.addEventListener('click', () => {
+      dom.adminModal.style.display = 'none';
+    });
+
+    // Handle global delete user function
+    window.deleteUser = async (userId) => {
+      if (!confirm('Delete this user? This cannot be undone.')) return;
+      try {
+        await apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
+        dom.adminBtn.click(); // reload
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    };
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -793,9 +1020,15 @@
 
   // ── Boot ──
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', async () => {
+      init();
+      updateAuthUI();
+      await syncStateFromApi();
+    });
   } else {
     init();
+    updateAuthUI();
+    syncStateFromApi();
   }
 
   // ============================================
