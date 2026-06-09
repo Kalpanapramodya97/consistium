@@ -963,31 +963,9 @@
       dom.authModal.style.display = 'none';
     });
 
-    // Admin Dashboard
-    dom.adminBtn.addEventListener('click', async () => {
-      dom.adminModal.style.display = 'flex';
-      try {
-        const stats = await apiFetch('/admin/stats');
-        dom.adminTotalUsers.textContent = stats.users;
-        dom.adminTotalHabits.textContent = stats.habits;
-        dom.adminTotalCompletions.textContent = stats.completions;
-
-        const users = await apiFetch('/admin/users');
-        dom.adminUserList.innerHTML = users.map(u => `
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
-            <div>
-              <strong>${u.name}</strong> (${u.email})
-              <span class="bad-badge" style="background: ${u.role === 'admin' ? 'var(--primary)' : '#666'}">${u.role}</span>
-            </div>
-            <button class="btn btn-danger btn-sm" onclick="deleteUser('${u._id}')">Delete</button>
-          </div>
-        `).join('');
-      } catch (err) {
-        dom.adminUserList.innerHTML = `<p style="color: red">Failed to load users: ${err.message}</p>`;
-      }
-    });
-    dom.adminCloseBtn.addEventListener('click', () => {
-      dom.adminModal.style.display = 'none';
+    // Admin Dashboard — navigate to dedicated page
+    dom.adminBtn.addEventListener('click', () => {
+      window.location.href = 'admin.html';
     });
 
     // Handle global delete user function

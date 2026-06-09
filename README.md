@@ -47,7 +47,10 @@
 
 ### 👥 Multi-User & Admin Panel
 - **User Accounts** — Secure user registration and login with JWT authentication, backed by a Node.js/Express API and MongoDB.
-- **Admin Dashboard** — The first registered user automatically becomes an admin. Access the admin panel to view system-wide statistics (total users, habits, completions) and manage/delete users.
+- **Admin Dashboard** — The first registered user automatically becomes an admin. Click the 🛡️ shield icon in the header to access a **dedicated full-page admin dashboard** featuring:
+  - **Stats Overview** — Animated counter cards for total users, habits, and completions.
+  - **User Management** — View all registered users in a sortable table with role badges, join dates, and the ability to delete accounts.
+  - **Dark-mode glassmorphism UI** — A sleek, modern design with sidebar navigation and smooth transitions.
 - **Optimistic Sync** — The app falls back gracefully to `localStorage` when offline, and automatically syncs data with the backend when you are logged in.
 
 ### 📊 Gamification & Insights
@@ -89,6 +92,7 @@ Once the containers are running, you can access the various services at the foll
 | Service | Access URL | Credentials (if applicable) | Description |
 |:---|:---|:---|:---|
 | **Consistium App** | [http://localhost:3000](http://localhost:3000) | Register to create account | Main frontend application (Nginx). First user becomes Admin. |
+| **Admin Dashboard** | [http://localhost:3000/admin.html](http://localhost:3000/admin.html) | Admin account required | Full-page admin panel for stats and user management. |
 | **Backend API** | [http://localhost:5000/api/health](http://localhost:5000/api/health) | N/A | Node.js Express API Healthcheck (also proxied via frontend). |
 | **Grafana** | [http://localhost:3001](http://localhost:3001) | User: `admin`, Pass: `admin` | Observability UI for metrics (Prometheus) and logs (Loki). |
 | **Prometheus** | [http://localhost:9090](http://localhost:9090) | N/A | Time-series database scraping Nginx metrics. |
@@ -118,7 +122,7 @@ Consistium goes beyond just being a frontend app—it serves as a **reference ar
 
 | Layer | Technologies |
 |:---|:---|
-| **Frontend** | HTML5, CSS3 (Glassmorphism), Vanilla JavaScript |
+| **Frontend** | HTML5, CSS3 (Glassmorphism), Vanilla JavaScript, Admin Dashboard |
 | **Containerization** | Docker, multi-stage Alpine Nginx builds |
 | **Orchestration** | Kubernetes, Helm v3 |
 | **Observability** | Prometheus, Grafana, Loki (LogQL) |

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consistium Admin Dashboard</title>
+    <!-- Use similar fonts to the main app, e.g., Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Shared Styles -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Admin Specific Styles -->
+    <link rel="stylesheet" href="assets/css/admin.css">
+</head>
+<body class="admin-body">
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fa-solid fa-chart-line"></i> AdminPanel</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="active" data-target="dashboard-view"><i class="fa-solid fa-house"></i> Dashboard</li>
+                    <li data-target="users-view"><i class="fa-solid fa-users"></i> Users</li>
+                    <li><a href="index.html" class="back-link"><i class="fa-solid fa-arrow-left"></i> Back to App</a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="admin-logout-btn" class="btn btn-danger"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <header class="admin-topbar">
+                <h1>Admin Overview</h1>
+                <div class="admin-profile">
+                    <span id="admin-name">Admin User</span>
+                    <div class="avatar-placeholder"><i class="fa-solid fa-user-shield"></i></div>
+                </div>
+            </header>
+
+            <div class="admin-content">
+                <!-- Dashboard View -->
+                <section id="dashboard-view" class="view-section active-view">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon users-icon"><i class="fa-solid fa-users"></i></div>
+                            <div class="stat-info">
+                                <h3>Total Users</h3>
+                                <p id="stat-users">...</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon habits-icon"><i class="fa-solid fa-bullseye"></i></div>
+                            <div class="stat-info">
+                                <h3>Total Habits</h3>
+                                <p id="stat-habits">...</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon completions-icon"><i class="fa-solid fa-check-circle"></i></div>
+                            <div class="stat-info">
+                                <h3>Completions</h3>
+                                <p id="stat-completions">...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="recent-activity-container">
+                        <h2>System Information</h2>
+                        <div class="glass-panel">
+                            <p>Welcome to the Consistium admin dashboard. From here, you can monitor system statistics and manage user accounts.</p>
+                            <p><strong>Note:</strong> Be careful when deleting users, as this action is irreversible and removes all their habit data.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Users View -->
+                <section id="users-view" class="view-section hidden-view">
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h2>User Management</h2>
+                            <div class="table-actions">
+                                <button id="refresh-users-btn" class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
+                            </div>
+                        </div>
+                        <table class="modern-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Joined Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <!-- User rows will be injected here -->
+                                <tr>
+                                    <td colspan="5" style="text-align: center;">Loading users...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- API Config -->
+    <script>
+        // Use the same API URL configuration as the main app
+        const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://localhost:5000/api' 
+            : '/api';
+    </script>
+    <!-- Admin Logic -->
+    <script src="assets/js/admin.js"></script>
+</body>
+</html>
