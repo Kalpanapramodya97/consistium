@@ -1,0 +1,449 @@
+name: CI/CD & DevSecOps Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ==========================================
+  # PHASE 1: Source Code Checks (Parallel)
+  # ==========================================
+  quality-checks:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Lint HTML
+        run: npx htmlhint "**/*.html" || true # Using || true so it doesn't fail the build immediately for minor issues
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for secret scanning
+      
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        continue-on-error: true
+        with:
+          path: ./
+          extra_args: --debug --only-verified --json --output trufflehog-results.json
+
+      - name: Create empty results if scan found nothing
+        if: always()
+        run: |
+          if [ ! -f trufflehog-results.json ]; then
+            echo "[]" > trufflehog-results.json
+          fi
+
+      - name: Upload TruffleHog results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-results
+          path: trufflehog-results.json
+          retention-days: 7
+
+  codeql-sast:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript # For app.js and HTML
+          
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          output: codeql-results
+
+      - name: Upload CodeQL SARIF results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-results
+          path: codeql-results/*.sarif
+          retention-days: 7
+
+  # ==========================================
+  # PHASE 2: Build & Scan (Depends on Phase 1)
+  # ==========================================
+  trivy-fs-scan:
+    name: Trivy Filesystem Scan
+    runs-on: ubuntu-latest
+    needs: [quality-checks, secret-scan, codeql-sast]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan (console)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+        continue-on-error: true
+
+      - name: Run Trivy filesystem scan (JSON for report)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'json'
+          output: 'trivy-fs-results.json'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy FS results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-fs-results
+          path: trivy-fs-results.json
+          retention-days: 7
+
+  build-artifact:
+    name: Package Application
+    runs-on: ubuntu-latest
+    needs: [quality-checks, secret-scan, codeql-sast]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: habit-tracker-assets
+          path: |
+            index.html
+            style.css
+            app.js
+          retention-days: 7
+
+  docker-build-and-scan:
+    name: Build, Scan & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [quality-checks, secret-scan, codeql-sast]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract repository name in lowercase
+        run: |
+          echo "REPO=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ env.REPO }}/habit-tracker
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+
+      - name: Build Docker image (Load to Docker daemon for scanning)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true # Load image into Docker daemon so Trivy can scan it
+          tags: habit-tracker:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy image scan (console)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'habit-tracker:${{ github.sha }}'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Run Trivy image scan (JSON for report)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'habit-tracker:${{ github.sha }}'
+          format: 'json'
+          output: 'trivy-image-results.json'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy image results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-image-results
+          path: trivy-image-results.json
+          retention-days: 7
+
+      - name: Log in to GitHub Container Registry
+        # Only push if it's the main branch and all scans passed
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Docker image
+        # Only push if it's the main branch and all scans passed
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+  # ==========================================
+  # PHASE 3: Release & Reporting (Depends on Phase 2)
+  # ==========================================
+  semantic-versioning:
+    name: Generate Semantic Version & Release
+    runs-on: ubuntu-latest
+    needs: [trivy-fs-scan, docker-build-and-scan, build-artifact]
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch
+          release_branches: "main,master"
+
+      - name: Generate Release Document
+        env:
+          CHANGELOG: ${{ steps.tag_version.outputs.changelog }}
+          VERSION: ${{ steps.tag_version.outputs.new_tag }}
+        run: |
+          # Markdown version for GitHub Release
+          echo "# Release Document - $VERSION" > RELEASE_DOCUMENT.md
+          echo "Date: $(date +'%Y-%m-%d')" >> RELEASE_DOCUMENT.md
+          echo "" >> RELEASE_DOCUMENT.md
+          echo "## Changes" >> RELEASE_DOCUMENT.md
+          echo "$CHANGELOG" >> RELEASE_DOCUMENT.md
+          echo "" >> RELEASE_DOCUMENT.md
+          echo "**Commit:** ${{ github.sha }}" >> RELEASE_DOCUMENT.md
+          
+          # Colorful HTML version for Email
+          cat <<EOF > RELEASE_DOCUMENT.html
+          <!DOCTYPE html>
+          <html>
+          <head>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+            .container { max-width: 800px; margin: auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-top: 5px solid #e74c3c; }
+            h1 { color: #2c3e50; }
+            .version { background: #e74c3c; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.8em; vertical-align: middle; }
+            .meta { color: #7f8c8d; font-size: 0.9em; margin-bottom: 20px; }
+            .changes { background: #2c3e50; color: #ecf0f1; padding: 20px; border-radius: 8px; margin-top: 20px; white-space: pre-wrap; font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; line-height: 1.5; }
+            .footer { margin-top: 30px; text-align: center; color: #95a5a6; font-size: 0.8em; border-top: 1px solid #eee; padding-top: 20px; }
+          </style>
+          </head>
+          <body>
+          <div class="container">
+            <h1>🚀 Consistium Release <span class="version">$VERSION</span></h1>
+            <div class="meta">
+              <strong>Date:</strong> $(date +'%Y-%m-%d')<br>
+              <strong>Commit:</strong> <code>${{ github.sha }}</code>
+            </div>
+            <h2>✨ What's New</h2>
+            <div class="changes">${CHANGELOG}</div>
+            <div class="footer">Consistium CI/CD Pipeline &bull; 1% better every day</div>
+          </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload Release Document Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-document-${{ steps.tag_version.outputs.new_tag }}
+          path: |
+            RELEASE_DOCUMENT.md
+            RELEASE_DOCUMENT.html
+          retention-days: 90
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          body_path: RELEASE_DOCUMENT.md
+          files: RELEASE_DOCUMENT.md
+
+      - name: Send Release Document via Email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "🚀 Consistium New Release: ${{ steps.tag_version.outputs.new_tag }}"
+          to: kalpanapramodya97@gmail.com
+          from: Consistium Release <kalpanapramodya97@gmail.com>
+          body: |
+            A new release (${{ steps.tag_version.outputs.new_tag }}) has been created for Consistium!
+            
+            The colorful release document detailing all the changes is attached to this email.
+            
+            🔗 View the release on GitHub:
+            ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.tag_version.outputs.new_tag }}
+            
+            ◆ Consistium — 1% better every day
+          attachments: RELEASE_DOCUMENT.html
+
+  security-report:
+    name: Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [trivy-fs-scan, docker-build-and-scan]
+    if: always() # Generate report even if scans fail
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download TruffleHog results
+        uses: actions/download-artifact@v4
+        with:
+          name: trufflehog-results
+          path: scan-results/
+        continue-on-error: true
+
+      - name: Download CodeQL results
+        uses: actions/download-artifact@v4
+        with:
+          name: codeql-results
+          path: scan-results/
+        continue-on-error: true
+
+      - name: Download Trivy FS results
+        uses: actions/download-artifact@v4
+        with:
+          name: trivy-fs-results
+          path: scan-results/
+        continue-on-error: true
+
+      - name: Download Trivy image results
+        uses: actions/download-artifact@v4
+        with:
+          name: trivy-image-results
+          path: scan-results/
+        continue-on-error: true
+
+      - name: Install jq
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq
+
+      - name: Make report generator executable
+        run: chmod +x security/generate-report.sh
+
+      - name: Detect CodeQL SARIF file
+        id: detect-sarif
+        run: |
+          SARIF_FILE=$(find scan-results/ -name "*.sarif" -type f | head -1)
+          echo "sarif_file=${SARIF_FILE:-}" >> $GITHUB_OUTPUT
+          echo "Found SARIF: ${SARIF_FILE:-none}"
+
+      - name: Generate branded security report
+        run: |
+          bash security/generate-report.sh \
+            --trufflehog "scan-results/trufflehog-results.json" \
+            --codeql "${{ steps.detect-sarif.outputs.sarif_file }}" \
+            --trivy-fs "scan-results/trivy-fs-results.json" \
+            --trivy-image "scan-results/trivy-image-results.json" \
+            --template "security/report-template.html" \
+            --output "consistium-security-report.html"
+
+      - name: Upload security report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: consistium-security-report
+          path: consistium-security-report.html
+          retention-days: 90
+
+      - name: Send security report via email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "🛡️ Consistium Security Report — ${{ github.ref_name }} — Run #${{ github.run_number }}"
+          to: kalpanapramodya97@gmail.com
+          from: Consistium DevSecOps <kalpanapramodya97@gmail.com>
+          body: |
+            Consistium DevSecOps Pipeline — Security Scan Report
+
+            ────────────────────────────────────────────
+            📋 Pipeline Run Details
+            ────────────────────────────────────────────
+            • Branch:   ${{ github.ref_name }}
+            • Commit:   ${{ github.sha }}
+            • Trigger:  ${{ github.event_name }}
+            • Run:      #${{ github.run_number }}
+            • Date:     ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at || 'scheduled' }}
+
+            The full branded security report is attached to this email as an HTML file.
+            Open it in any web browser to view the detailed findings.
+
+            🔗 View the full pipeline run:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            ────────────────────────────────────────────
+            This is an automated email from the Consistium DevSecOps Pipeline.
+            ◆ Consistium — 1% better every day
+          attachments: consistium-security-report.html

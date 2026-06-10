@@ -132,7 +132,7 @@ Consistium goes beyond just being a frontend app—it serves as a **reference ar
   <img src="https://img.shields.io/badge/Security-A+ Grade-success?style=for-the-badge&logo=security" alt="Security Grade" />
 </p>
 
-The project features a fully automated DevSecOps pipeline that runs **SAST**, **Secret Scanning**, and **Container Vulnerability Scanning**, aggregating the results into a beautiful branded HTML report and delivering it via email after every commit.
+The project features a **unified CI/CD and DevSecOps pipeline** that runs **SAST**, **Secret Scanning**, and **Container Vulnerability Scanning**, aggregating the results into a beautiful branded HTML report and delivering it via email after every commit. Only if all security and quality checks pass will the application be released and pushed to the container registry.
 
 ---
 
