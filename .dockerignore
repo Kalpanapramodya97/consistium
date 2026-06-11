@@ -1,0 +1,14 @@
+.git
+.github
+backend/
+docs/
+grafana/
+helm/
+loki/
+prometheus/
+promtail/
+security/
+docker-compose.yml
+Dockerfile
+.gitignore
+.dockerignore
