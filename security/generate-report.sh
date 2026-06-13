@@ -25,7 +25,7 @@
 set -euo pipefail
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 TEMPLATE="${SCRIPT_DIR}/report-template.html"
 OUTPUT="consistium-security-report.html"
 TRUFFLEHOG_FILE=""
@@ -484,7 +484,8 @@ REPORT="${REPORT//\{\{LOW_BAR_LABEL\}\}/${LOW_BAR_LABEL}}"
 
 # Section content — use temp files for multi-line content to avoid sed issues
 # Write section content to temp files for reliable substitution
-TMPDIR_REPORT=$(mktemp -d)
+TMPDIR_REPORT="security/tmp_report_$(date +%s)"
+mkdir -p "$TMPDIR_REPORT"
 trap 'rm -rf "$TMPDIR_REPORT"' EXIT
 
 
@@ -494,74 +495,73 @@ echo "$SAST_SCAN_CONTENT" > "${TMPDIR_REPORT}/sast.html"
 echo "$TRIVY_FS_CONTENT" > "${TMPDIR_REPORT}/trivy_fs.html"
 echo "$TRIVY_IMAGE_CONTENT" > "${TMPDIR_REPORT}/trivy_image.html"
 
-# Use Python for reliable multi-line substitution
-python3 << PYEOF > "$OUTPUT"
-import sys
+# Use Node.js for reliable multi-line substitution
+node -e "
+const fs = require('fs');
 
-with open("$TEMPLATE", "r") as f:
-    report = f.read()
+let report = fs.readFileSync('$TEMPLATE', 'utf8');
 
-# Simple replacements
-simple = {
-    "{{REPORT_DATE}}": "${REPORT_DATE}",
-    "{{REPORT_DATETIME}}": "${REPORT_DATETIME}",
-    "{{COMMIT_SHA}}": "${COMMIT_SHA_SHORT}",
-    "{{BRANCH_NAME}}": "${BRANCH_NAME}",
-    "{{RUN_NUMBER}}": "${RUN_NUMBER}",
-    "{{TRIGGER_EVENT}}": "${TRIGGER_EVENT}",
-    "{{REPO_URL}}": "${REPO_URL}",
-    "{{RUN_URL}}": "${RUN_URL}",
-    "{{OVERALL_STATUS_TEXT}}": "${OVERALL_STATUS_TEXT}",
-    "{{OVERALL_STATUS_CLASS}}": "${OVERALL_STATUS_CLASS}",
-    "{{OVERALL_STATUS_ICON}}": "${OVERALL_STATUS_ICON}",
-    "{{TOTAL_FINDINGS}}": "${TOTAL_FINDINGS}",
-    "{{CRITICAL_COUNT}}": "${CRITICAL_COUNT}",
-    "{{HIGH_COUNT}}": "${HIGH_COUNT}",
-    "{{MEDIUM_COUNT}}": "${MEDIUM_COUNT}",
-    "{{LOW_COUNT}}": "${LOW_COUNT}",
-    "{{CRITICAL_PCT}}": "${CRITICAL_PCT}",
-    "{{HIGH_PCT}}": "${HIGH_PCT}",
-    "{{MEDIUM_PCT}}": "${MEDIUM_PCT}",
-    "{{LOW_PCT}}": "${LOW_PCT}",
-    "{{CRITICAL_BAR_LABEL}}": "${CRITICAL_BAR_LABEL}",
-    "{{HIGH_BAR_LABEL}}": "${HIGH_BAR_LABEL}",
-    "{{MEDIUM_BAR_LABEL}}": "${MEDIUM_BAR_LABEL}",
-    "{{LOW_BAR_LABEL}}": "${LOW_BAR_LABEL}",
-    "{{SECRET_SCAN_STATUS}}": "${SECRET_SCAN_STATUS}",
-    "{{SECRET_SCAN_STATUS_CLASS}}": "${SECRET_SCAN_STATUS_CLASS}",
-    "{{SECRET_SCAN_STATUS_ICON}}": "${SECRET_SCAN_STATUS_ICON}",
-    "{{SAST_SCAN_STATUS}}": "${SAST_SCAN_STATUS}",
-    "{{SAST_SCAN_STATUS_CLASS}}": "${SAST_SCAN_STATUS_CLASS}",
-    "{{SAST_SCAN_STATUS_ICON}}": "${SAST_SCAN_STATUS_ICON}",
-    "{{TRIVY_FS_STATUS}}": "${TRIVY_FS_STATUS}",
-    "{{TRIVY_FS_STATUS_CLASS}}": "${TRIVY_FS_STATUS_CLASS}",
-    "{{TRIVY_FS_STATUS_ICON}}": "${TRIVY_FS_STATUS_ICON}",
-    "{{TRIVY_IMAGE_STATUS}}": "${TRIVY_IMAGE_STATUS}",
-    "{{TRIVY_IMAGE_STATUS_CLASS}}": "${TRIVY_IMAGE_STATUS_CLASS}",
-    "{{TRIVY_IMAGE_STATUS_ICON}}": "${TRIVY_IMAGE_STATUS_ICON}",
+const simple = {
+    '{{REPORT_DATE}}': '${REPORT_DATE}',
+    '{{REPORT_DATETIME}}': '${REPORT_DATETIME}',
+    '{{COMMIT_SHA}}': '${COMMIT_SHA_SHORT}',
+    '{{BRANCH_NAME}}': '${BRANCH_NAME}',
+    '{{RUN_NUMBER}}': '${RUN_NUMBER}',
+    '{{TRIGGER_EVENT}}': '${TRIGGER_EVENT}',
+    '{{REPO_URL}}': '${REPO_URL}',
+    '{{RUN_URL}}': '${RUN_URL}',
+    '{{OVERALL_STATUS_TEXT}}': '${OVERALL_STATUS_TEXT}',
+    '{{OVERALL_STATUS_CLASS}}': '${OVERALL_STATUS_CLASS}',
+    '{{OVERALL_STATUS_ICON}}': '${OVERALL_STATUS_ICON}',
+    '{{TOTAL_FINDINGS}}': '${TOTAL_FINDINGS}',
+    '{{CRITICAL_COUNT}}': '${CRITICAL_COUNT}',
+    '{{HIGH_COUNT}}': '${HIGH_COUNT}',
+    '{{MEDIUM_COUNT}}': '${MEDIUM_COUNT}',
+    '{{LOW_COUNT}}': '${LOW_COUNT}',
+    '{{CRITICAL_PCT}}': '${CRITICAL_PCT}',
+    '{{HIGH_PCT}}': '${HIGH_PCT}',
+    '{{MEDIUM_PCT}}': '${MEDIUM_PCT}',
+    '{{LOW_PCT}}': '${LOW_PCT}',
+    '{{CRITICAL_BAR_LABEL}}': '${CRITICAL_BAR_LABEL}',
+    '{{HIGH_BAR_LABEL}}': '${HIGH_BAR_LABEL}',
+    '{{MEDIUM_BAR_LABEL}}': '${MEDIUM_BAR_LABEL}',
+    '{{LOW_BAR_LABEL}}': '${LOW_BAR_LABEL}',
+    '{{SECRET_SCAN_STATUS}}': '${SECRET_SCAN_STATUS}',
+    '{{SECRET_SCAN_STATUS_CLASS}}': '${SECRET_SCAN_STATUS_CLASS}',
+    '{{SECRET_SCAN_STATUS_ICON}}': '${SECRET_SCAN_STATUS_ICON}',
+    '{{SAST_SCAN_STATUS}}': '${SAST_SCAN_STATUS}',
+    '{{SAST_SCAN_STATUS_CLASS}}': '${SAST_SCAN_STATUS_CLASS}',
+    '{{SAST_SCAN_STATUS_ICON}}': '${SAST_SCAN_STATUS_ICON}',
+    '{{TRIVY_FS_STATUS}}': '${TRIVY_FS_STATUS}',
+    '{{TRIVY_FS_STATUS_CLASS}}': '${TRIVY_FS_STATUS_CLASS}',
+    '{{TRIVY_FS_STATUS_ICON}}': '${TRIVY_FS_STATUS_ICON}',
+    '{{TRIVY_IMAGE_STATUS}}': '${TRIVY_IMAGE_STATUS}',
+    '{{TRIVY_IMAGE_STATUS_CLASS}}': '${TRIVY_IMAGE_STATUS_CLASS}',
+    '{{TRIVY_IMAGE_STATUS_ICON}}': '${TRIVY_IMAGE_STATUS_ICON}'
+};
+
+for (const [key, value] of Object.entries(simple)) {
+    report = report.split(key).join(value);
 }
 
-for key, value in simple.items():
-    report = report.replace(key, value)
+const content_files = {
+    '{{SECRET_SCAN_CONTENT}}': '${TMPDIR_REPORT}/secret.html',
+    '{{SAST_SCAN_CONTENT}}': '${TMPDIR_REPORT}/sast.html',
+    '{{TRIVY_FS_CONTENT}}': '${TMPDIR_REPORT}/trivy_fs.html',
+    '{{TRIVY_IMAGE_CONTENT}}': '${TMPDIR_REPORT}/trivy_image.html'
+};
 
-# Multi-line content from temp files
-content_files = {
-    "{{SECRET_SCAN_CONTENT}}": "${TMPDIR_REPORT}/secret.html",
-    "{{SAST_SCAN_CONTENT}}": "${TMPDIR_REPORT}/sast.html",
-    "{{TRIVY_FS_CONTENT}}": "${TMPDIR_REPORT}/trivy_fs.html",
-    "{{TRIVY_IMAGE_CONTENT}}": "${TMPDIR_REPORT}/trivy_image.html",
+for (const [key, filepath] of Object.entries(content_files)) {
+    try {
+        const content = fs.readFileSync(filepath, 'utf8');
+        report = report.split(key).join(content);
+    } catch (err) {
+        report = report.split(key).join('<p>Scan data not available</p>');
+    }
 }
 
-for key, filepath in content_files.items():
-    try:
-        with open(filepath, "r") as f:
-            content = f.read()
-        report = report.replace(key, content)
-    except FileNotFoundError:
-        report = report.replace(key, "<p>Scan data not available</p>")
-
-print(report)
-PYEOF
+console.log(report);
+" > "$OUTPUT"
 
 echo ""
 echo "✅ Report generated: ${OUTPUT}"

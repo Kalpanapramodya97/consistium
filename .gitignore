@@ -12,3 +12,8 @@ desktop.ini
 # Misc
 *.log
 node_modules/
+
+# Security Scans
+consistium-security-report.html
+trufflehog.json
+trivy-fs.json

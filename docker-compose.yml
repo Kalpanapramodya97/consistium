@@ -96,5 +96,16 @@ services:
     command: -config.file=/etc/promtail/config.yml
     restart: unless-stopped
 
+  ansible-runner:
+    build:
+      context: .
+      dockerfile: ansible/Dockerfile
+    container_name: ansible-runner
+    volumes:
+      - .:/workspace
+      - C:/Users/u/Downloads:/downloads
+    # We do not use restart: unless-stopped so it runs once and finishes, rather than looping infinitely.
+    restart: "no"
+
 volumes:
   mongodb_data:

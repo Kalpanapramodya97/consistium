@@ -1,0 +1,48 @@
+---
+- name: Generate Security Report
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Ensure git safe directory
+      ansible.builtin.command:
+        cmd: git config --global --add safe.directory /workspace
+      ignore_errors: true
+
+    - name: Run TruffleHog secret scan
+      ansible.builtin.command:
+        cmd: trufflehog filesystem /workspace --json
+        chdir: "{{ playbook_dir }}/.."
+      register: trufflehog_output
+      ignore_errors: true
+
+    - name: Save TruffleHog output
+      ansible.builtin.copy:
+        content: "{{ trufflehog_output.stdout }}"
+        dest: "{{ playbook_dir }}/../trufflehog.json"
+
+    - name: Run Trivy filesystem scan
+      ansible.builtin.command:
+        cmd: trivy fs /workspace --format json -q --scanners vuln --skip-dirs node_modules --skip-dirs .git
+        chdir: "{{ playbook_dir }}/.."
+      register: trivy_fs_output
+      ignore_errors: true
+
+    - name: Save Trivy output
+      ansible.builtin.copy:
+        content: "{{ trivy_fs_output.stdout }}"
+        dest: "{{ playbook_dir }}/../trivy-fs.json"
+
+    - name: Run the security report generator script
+      ansible.builtin.command:
+        cmd: bash security/generate-report.sh --trufflehog trufflehog.json --trivy-fs trivy-fs.json --output /downloads/consistium-security-report.html
+        chdir: "{{ playbook_dir }}/.."
+      register: script_output
+
+    - name: Display script output
+      ansible.builtin.debug:
+        var: script_output.stdout_lines
+
+    - name: Display script errors (if any)
+      ansible.builtin.debug:
+        var: script_output.stderr_lines
+      when: script_output.stderr_lines | length > 0
