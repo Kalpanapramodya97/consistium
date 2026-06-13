@@ -160,7 +160,7 @@ The project features a **unified CI/CD and DevSecOps pipeline** that runs **SAST
 
 ## 📄 License
 
-**MIT License** © 2026 Kalpana Pramodya
+**Apache License 2.0** © 2026 Kalpana Pramodya
 
 <div align="center">
   <br/>
