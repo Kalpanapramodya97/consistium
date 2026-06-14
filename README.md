@@ -21,6 +21,7 @@
     <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black" alt="JavaScript" />
     <img src="https://img.shields.io/badge/Docker-2CA5E0?style=flat-square&logo=docker&logoColor=white" alt="Docker" />
     <img src="https://img.shields.io/badge/Kubernetes-326CE5?style=flat-square&logo=kubernetes&logoColor=white" alt="Kubernetes" />
+    <img src="https://img.shields.io/badge/Terraform-7B42BC?style=flat-square&logo=terraform&logoColor=white" alt="Terraform" />
   </p>
 </div>
 
@@ -125,6 +126,7 @@ Consistium goes beyond just being a frontend app—it serves as a **reference ar
 | **Frontend** | HTML5, CSS3 (Glassmorphism), Vanilla JavaScript, Admin Dashboard |
 | **Containerization** | Docker, multi-stage Alpine Nginx builds |
 | **Orchestration** | Kubernetes, Helm v3 |
+| **Infrastructure** | Terraform (VPC, EKS, DocumentDB), modular IaC, multi-env |
 | **Observability** | Prometheus, Grafana, Loki (LogQL) |
 | **Security (CI/CD)** | GitHub Actions, TruffleHog (Secrets), CodeQL (SAST), Trivy (CVEs) |
 
