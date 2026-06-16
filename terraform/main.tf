@@ -65,9 +65,7 @@ provider "helm" {
 
 # ── Data Sources ─────────────────────────────────────────────
 
-# Fetch current AWS account ID and region for use in IAM policies
-data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
+# (No global data sources currently required)
 
 # ── Module: VPC ──────────────────────────────────────────────
 
