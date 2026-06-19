@@ -307,6 +307,37 @@
             Mark as <span class="new-badge-sm">New</span>
           </label>
         </div>
+        <div class="form-group">
+          <label for="habitRepeatPattern">Repeat Pattern</label>
+          <select id="habitRepeatPattern" class="form-control" style="width: 100%; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font); font-size: 0.9rem; transition: var(--transition);">
+            <option value="every_day">Every day</option>
+            <option value="every_other_day">Every other day</option>
+            <option value="specific_days">Specific days of the week</option>
+            <option value="weekdays">Weekdays only</option>
+            <option value="weekends">Weekends only</option>
+            <option value="custom_interval">Custom interval</option>
+          </select>
+        </div>
+        <div class="form-group" id="habitSpecificDaysGroup" style="display: none;">
+          <label>Select Days</label>
+          <div class="days-selector" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <label class="day-opt"><input type="checkbox" value="1"> Mon</label>
+            <label class="day-opt"><input type="checkbox" value="2"> Tue</label>
+            <label class="day-opt"><input type="checkbox" value="3"> Wed</label>
+            <label class="day-opt"><input type="checkbox" value="4"> Thu</label>
+            <label class="day-opt"><input type="checkbox" value="5"> Fri</label>
+            <label class="day-opt"><input type="checkbox" value="6"> Sat</label>
+            <label class="day-opt"><input type="checkbox" value="0"> Sun</label>
+          </div>
+        </div>
+        <div class="form-group" id="habitIntervalGroup" style="display: none;">
+          <label for="habitIntervalDays">Repeat Every (Days)</label>
+          <input type="number" id="habitIntervalDays" min="2" max="365" value="2" style="width: 100%; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font); font-size: 0.9rem;" />
+        </div>
+        <div class="form-group">
+          <label for="habitStartDate">Start Date</label>
+          <input type="date" id="habitStartDate" style="width: 100%; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font); font-size: 0.9rem;" />
+        </div>
         <input type="hidden" id="habitEditId" value="" />
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="deleteHabitBtn" style="display: none;">Delete</button>

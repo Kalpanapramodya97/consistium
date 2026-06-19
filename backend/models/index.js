@@ -52,6 +52,23 @@ const habitSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  repeatPattern: {
+    type: String,
+    enum: ['every_day', 'every_other_day', 'specific_days', 'weekdays', 'weekends', 'custom_interval'],
+    default: 'every_day'
+  },
+  selectedDays: {
+    type: [Number],
+    default: []
+  },
+  intervalDays: {
+    type: Number,
+    default: null
+  },
+  startDate: {
+    type: Date,
+    default: Date.now
+  },
   createdAt: {
     type: Date,
     default: Date.now,

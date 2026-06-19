@@ -110,6 +110,12 @@
     habitIsNew: $('#habitIsNew'),
     habitType: $('#habitType'),
     habitTypeToggle: $('#habitTypeToggle'),
+    habitRepeatPattern: $('#habitRepeatPattern'),
+    habitSpecificDaysGroup: $('#habitSpecificDaysGroup'),
+    habitIntervalGroup: $('#habitIntervalGroup'),
+    habitIntervalDays: $('#habitIntervalDays'),
+    habitStartDate: $('#habitStartDate'),
+    dayOpts: $$('.day-opt input[type="checkbox"]'),
     habitEditId: $('#habitEditId'),
     saveHabitBtn: $('#saveHabitBtn'),
     deleteHabitBtn: $('#deleteHabitBtn'),
@@ -176,6 +182,41 @@
     return d > t;
   }
 
+  function shouldHabitAppearOnDate(habit, date) {
+    if (habit.type === 'task') return true;
+    
+    const pattern = habit.repeatPattern || 'every_day';
+    const startDate = habit.startDate ? new Date(habit.startDate) : new Date(0);
+    resetToMidnight(startDate);
+    const d = new Date(date);
+    resetToMidnight(d);
+
+    if (d < startDate) return false;
+
+    const dayOfWeek = d.getDay();
+
+    if (pattern === 'every_day') return true;
+    if (pattern === 'weekdays') return dayOfWeek >= 1 && dayOfWeek <= 5;
+    if (pattern === 'weekends') return dayOfWeek === 0 || dayOfWeek === 6;
+    if (pattern === 'specific_days') {
+      const days = habit.selectedDays || [];
+      return days.includes(dayOfWeek);
+    }
+    
+    const diffTime = Math.abs(d - startDate);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (pattern === 'every_other_day') {
+      return diffDays % 2 === 0;
+    }
+    if (pattern === 'custom_interval') {
+      const interval = habit.intervalDays || 2;
+      return diffDays % interval === 0;
+    }
+
+    return true;
+  }
+
   // ── Auth & API ──
   const API_URL = '/api';
   let authToken = localStorage.getItem('consistium_token');
@@ -212,7 +253,11 @@
         name: h.name,
         emoji: h.emoji,
         type: h.type,
-        isNew: h.isNewHabit
+        isNew: h.isNewHabit,
+        repeatPattern: h.repeatPattern,
+        selectedDays: h.selectedDays,
+        intervalDays: h.intervalDays,
+        startDate: h.startDate
       }));
       
       // We'd ideally fetch completions for all days in state, but let's fetch today's at least
@@ -313,8 +358,9 @@
     const completions = state.completions[key] || {};
     const todayTasks = state.tasks[key] || [];
     
-    const total = state.habits.length + todayTasks.length;
-    let done = state.habits.filter(h => getHabitScore(h, completions)).length;
+    const activeHabits = state.habits.filter(h => shouldHabitAppearOnDate(h, currentDate));
+    const total = activeHabits.length + todayTasks.length;
+    let done = activeHabits.filter(h => getHabitScore(h, completions)).length;
     done += todayTasks.filter(t => t.isCompleted).length;
     
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -470,8 +516,9 @@
     dom.badHabitList.innerHTML = '';
     dom.specialTaskList.innerHTML = '';
 
-    const goodHabits = state.habits.filter(h => h.type !== 'bad');
-    const badHabits = state.habits.filter(h => h.type === 'bad');
+    const activeHabits = state.habits.filter(h => shouldHabitAppearOnDate(h, currentDate));
+    const goodHabits = activeHabits.filter(h => h.type !== 'bad');
+    const badHabits = activeHabits.filter(h => h.type === 'bad');
 
     goodHabits.forEach((h, i) => dom.goodHabitList.appendChild(buildHabitCard(h, completions, i)));
     badHabits.forEach((h, i) => dom.badHabitList.appendChild(buildHabitCard(h, completions, i)));
@@ -496,7 +543,8 @@
     const todayKey = dateKey(today);
     const todayCompletions = state.completions[todayKey] || {};
     const todayTasks = state.tasks[todayKey] || [];
-    const todayDone = state.habits.every(h => getHabitScore(h, todayCompletions)) &&
+    const todayActiveHabits = state.habits.filter(h => shouldHabitAppearOnDate(h, today));
+    const todayDone = todayActiveHabits.every(h => getHabitScore(h, todayCompletions)) &&
                       (todayTasks.length === 0 || todayTasks.every(t => t.isCompleted));
 
     if (!todayDone) {
@@ -507,8 +555,9 @@
       const key = dateKey(checkDate);
       const completions = state.completions[key] || {};
       const tasks = state.tasks[key] || [];
-      const hasHabits = state.habits.length > 0;
-      const allDone = hasHabits && state.habits.every(h => getHabitScore(h, completions)) &&
+      const activeHabits = state.habits.filter(h => shouldHabitAppearOnDate(h, checkDate));
+      const hasHabits = activeHabits.length > 0;
+      const allDone = hasHabits && activeHabits.every(h => getHabitScore(h, completions)) &&
                       (tasks.length === 0 || tasks.every(t => t.isCompleted));
       if (!allDone) break;
       streak++;
@@ -516,7 +565,7 @@
     }
 
     // Include today if all done
-    if (todayDone && state.habits.length > 0) streak++;
+    if (todayDone && state.habits.filter(h => shouldHabitAppearOnDate(h, today)).length > 0) streak++;
 
     dom.streakCount.textContent = streak;
   }
@@ -538,8 +587,9 @@
       const completions = state.completions[key] || {};
       const tasks = state.tasks[key] || [];
       
-      const total = state.habits.length + tasks.length;
-      let done = state.habits.filter(h => getHabitScore(h, completions)).length;
+      const activeHabits = state.habits.filter(h => shouldHabitAppearOnDate(h, d));
+      const total = activeHabits.length + tasks.length;
+      let done = activeHabits.filter(h => getHabitScore(h, completions)).length;
       done += tasks.filter(t => t.isCompleted).length;
       
       const pct = total > 0 ? done / total : 0;
@@ -647,6 +697,12 @@
   }
 
   // ── Modal Logic ──
+  function updateRepeatUI() {
+    const val = dom.habitRepeatPattern.value;
+    dom.habitSpecificDaysGroup.style.display = val === 'specific_days' ? 'block' : 'none';
+    dom.habitIntervalGroup.style.display = val === 'custom_interval' ? 'block' : 'none';
+  }
+
   function setModalType(type) {
     dom.habitType.value = type;
     $$('.type-opt').forEach(b => b.classList.toggle('selected', b.dataset.type === type));
@@ -669,6 +725,13 @@
     dom.habitName.value = '';
     dom.habitIsNew.checked = false;
     dom.habitEditId.value = '';
+    
+    dom.habitRepeatPattern.value = 'every_day';
+    dom.habitIntervalDays.value = '2';
+    dom.habitStartDate.value = new Date().toISOString().split('T')[0];
+    dom.dayOpts.forEach(opt => opt.checked = false);
+    updateRepeatUI();
+
     setModalType('good');
     dom.habitModal.style.display = 'flex';
     dom.habitName.focus();
@@ -681,6 +744,20 @@
     dom.habitName.value = habit.name;
     dom.habitIsNew.checked = habit.isNew;
     dom.habitEditId.value = habit.id;
+    
+    dom.habitRepeatPattern.value = habit.repeatPattern || 'every_day';
+    dom.habitIntervalDays.value = habit.intervalDays || '2';
+    if (habit.startDate) {
+      dom.habitStartDate.value = new Date(habit.startDate).toISOString().split('T')[0];
+    } else {
+      dom.habitStartDate.value = new Date().toISOString().split('T')[0];
+    }
+    const days = habit.selectedDays || [];
+    dom.dayOpts.forEach(opt => {
+      opt.checked = days.includes(parseInt(opt.value, 10));
+    });
+    updateRepeatUI();
+
     setModalType(habit.type || 'good');
     dom.habitEmoji.value = habit.emoji;
     $$('.emoji-opt').forEach(b => b.classList.toggle('selected', b.dataset.emoji === habit.emoji));
@@ -701,6 +778,11 @@
     const emoji = dom.habitEmoji.value;
     const isNew = dom.habitIsNew.checked;
     const type = dom.habitType.value || 'good';
+    
+    const repeatPattern = dom.habitRepeatPattern.value;
+    const intervalDays = parseInt(dom.habitIntervalDays.value, 10);
+    const startDate = new Date(dom.habitStartDate.value);
+    const selectedDays = Array.from(dom.dayOpts).filter(opt => opt.checked).map(opt => parseInt(opt.value, 10));
 
     if (type === 'task') {
       const key = dateKey(currentDate);
@@ -723,12 +805,12 @@
           if (editId && !editId.startsWith('_')) {
             await apiFetch(`/habits/${editId}`, {
               method: 'PUT',
-              body: JSON.stringify({ name, emoji, type, isNewHabit: isNew })
+              body: JSON.stringify({ name, emoji, type, isNewHabit: isNew, repeatPattern, selectedDays, intervalDays, startDate })
             });
           } else {
             await apiFetch('/habits', {
               method: 'POST',
-              body: JSON.stringify({ name, emoji, type, isNewHabit: isNew })
+              body: JSON.stringify({ name, emoji, type, isNewHabit: isNew, repeatPattern, selectedDays, intervalDays, startDate })
             });
           }
           await syncStateFromApi();
@@ -741,9 +823,13 @@
               habit.emoji = emoji;
               habit.isNew = isNew;
               habit.type = type;
+              habit.repeatPattern = repeatPattern;
+              habit.selectedDays = selectedDays;
+              habit.intervalDays = intervalDays;
+              habit.startDate = startDate;
             }
           } else {
-            state.habits.push({ id: genId(), emoji, name, isNew, type });
+            state.habits.push({ id: genId(), emoji, name, isNew, type, repeatPattern, selectedDays, intervalDays, startDate });
           }
           saveState();
           renderAll();
@@ -878,6 +964,7 @@
     });
     dom.habitForm.addEventListener('submit', saveHabit);
     dom.deleteHabitBtn.addEventListener('click', deleteHabit);
+    dom.habitRepeatPattern.addEventListener('change', updateRepeatUI);
 
     // Habit type toggle
     $$('.type-opt').forEach(btn => {

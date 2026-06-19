@@ -605,6 +605,20 @@ body {
 .emoji-opt:hover { border-color: var(--accent); transform: scale(1.1); }
 .emoji-opt.selected { border-color: var(--accent); background: var(--accent-glow); }
 
+.day-opt {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 10px; background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  transition: var(--transition); color: var(--text-secondary);
+}
+.day-opt:hover { border-color: var(--accent); color: var(--text-primary); }
+.day-opt input { display: none; }
+.day-opt:has(input:checked) {
+  border-color: var(--accent); background: var(--accent-glow);
+  color: var(--text-primary);
+}
+
 .modal-actions {
   display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;
 }

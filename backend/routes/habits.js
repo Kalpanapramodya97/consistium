@@ -23,7 +23,7 @@ router.get('/', async (req, res) => {
 // @access  Private
 router.post('/', async (req, res) => {
   try {
-    const { name, emoji, type, isNewHabit } = req.body;
+    const { name, emoji, type, isNewHabit, repeatPattern, selectedDays, intervalDays, startDate } = req.body;
 
     if (!name) {
       return res.status(400).json({ message: 'Habit name is required' });
@@ -34,7 +34,11 @@ router.post('/', async (req, res) => {
       name,
       emoji: emoji || '🎯',
       type: type || 'good',
-      isNewHabit: isNewHabit || false
+      isNewHabit: isNewHabit || false,
+      repeatPattern: repeatPattern || 'every_day',
+      selectedDays: selectedDays || [],
+      intervalDays: intervalDays || null,
+      startDate: startDate || new Date()
     });
 
     res.status(201).json(habit);
