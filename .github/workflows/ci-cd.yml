@@ -163,7 +163,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Start Application Stack
-        run: docker-compose up -d consistium backend mongodb
+        run: docker compose up -d consistium backend mongodb
 
       - name: Wait for Application to be Ready
         run: |
