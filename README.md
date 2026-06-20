@@ -128,13 +128,13 @@ Consistium goes beyond just being a frontend app—it serves as a **reference ar
 | **Orchestration** | Kubernetes, Helm v3 |
 | **Infrastructure** | Terraform (VPC, EKS, DocumentDB), modular IaC, multi-env |
 | **Observability** | Prometheus, Grafana, Loki (LogQL) |
-| **Security (CI/CD)** | GitHub Actions, TruffleHog (Secrets), CodeQL (SAST), Trivy (CVEs) |
+| **Security (CI/CD)** | GitHub Actions, TruffleHog (Secrets), CodeQL (SAST), Trivy (CVEs), OWASP ZAP (DAST) |
 
 <p align="center">
   <img src="https://img.shields.io/badge/Security-A+ Grade-success?style=for-the-badge&logo=security" alt="Security Grade" />
 </p>
 
-The project features a **unified CI/CD and DevSecOps pipeline** that runs **SAST**, **Secret Scanning**, and **Container Vulnerability Scanning**, aggregating the results into a beautiful branded HTML report and delivering it via email after every commit. Only if all security and quality checks pass will the application be released and pushed to the container registry.
+The project features a **unified CI/CD and DevSecOps pipeline** that runs **SAST**, **DAST** (OWASP ZAP), **Secret Scanning**, and **Container Vulnerability Scanning**, aggregating the results into a beautiful branded HTML report and delivering it via email after every commit. Only if all security and quality checks pass will the application be released and pushed to the container registry.
 
 ---
 
