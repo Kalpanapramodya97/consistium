@@ -168,14 +168,24 @@ jobs:
       - name: Wait for Application to be Ready
         run: |
           echo "Waiting for frontend to be available at http://localhost:3000..."
-          for i in {1..12}; do
+          app_ready=false
+          for i in {1..15}; do
             if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
               echo "Application is up and running!"
+              app_ready=true
               break
             fi
             echo "Waiting..."
             sleep 5
           done
+          if [ "$app_ready" = false ]; then
+            echo "Application failed to start!"
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Fix workspace permissions for ZAP
+        run: chmod -R 777 .
 
       - name: Run ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.12.0
