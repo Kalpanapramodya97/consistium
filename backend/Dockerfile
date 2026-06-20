@@ -14,7 +14,7 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install production dependencies only — no devDependencies
-RUN npm ci --omit=dev --ignore-scripts && \
+RUN npm ci --omit=dev && \
     # Remove npm cache to reduce image size
     npm cache clean --force
 
