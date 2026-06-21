@@ -91,6 +91,10 @@
           <span class="stat-value" id="habitsCompleted">0</span>
           <span class="stat-label">Completed</span>
         </div>
+        <div class="stat-card" id="statPoints">
+          <span class="stat-value" id="pointsEarned" style="font-size:0.95rem;">0/0</span>
+          <span class="stat-label">Points</span>
+        </div>
         <div class="stat-card" id="statStatus">
           <span class="stat-value stat-status" id="statusText">Pending</span>
           <span class="stat-label">Status</span>
@@ -300,6 +304,32 @@
         <div class="form-group">
           <label for="habitName">Habit Name</label>
           <input type="text" id="habitName" placeholder="e.g. Read 10 pages" required autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label>Difficulty / Points</label>
+          <div class="difficulty-selector" id="difficultySelectorGroup">
+            <button type="button" class="diff-opt selected" data-points="1" id="diffEasy">
+              <span class="diff-icon">🟢</span>
+              <span class="diff-label">Easy</span>
+              <span class="diff-pts">1 pt</span>
+            </button>
+            <button type="button" class="diff-opt" data-points="2" id="diffMedium">
+              <span class="diff-icon">🟡</span>
+              <span class="diff-label">Medium</span>
+              <span class="diff-pts">2 pts</span>
+            </button>
+            <button type="button" class="diff-opt" data-points="3" id="diffHard">
+              <span class="diff-icon">🟠</span>
+              <span class="diff-label">Hard</span>
+              <span class="diff-pts">3 pts</span>
+            </button>
+            <button type="button" class="diff-opt" data-points="5" id="diffCritical">
+              <span class="diff-icon">🔴</span>
+              <span class="diff-label">Critical</span>
+              <span class="diff-pts">5 pts</span>
+            </button>
+          </div>
+          <input type="hidden" id="habitPoints" value="1" />
         </div>
         <div class="form-group">
           <label>

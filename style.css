@@ -757,6 +757,71 @@ body {
 .type-opt-text { font-size: 0.82rem; font-weight: 600; }
 .type-opt-desc { font-size: 0.65rem; color: var(--text-muted); }
 
+/* ── Difficulty Selector ── */
+.difficulty-selector {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+}
+
+.diff-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 10px 6px; background: var(--bg-card);
+  border: 2px solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer; transition: var(--transition);
+  font-family: var(--font); color: var(--text-secondary);
+}
+
+.diff-opt:hover { transform: translateY(-1px); border-color: var(--accent); }
+
+.diff-icon { font-size: 1.1rem; }
+
+.diff-label { font-size: 0.72rem; font-weight: 700; }
+
+.diff-pts {
+  font-size: 0.62rem; color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+/* Easy = green */
+.diff-opt[data-points="1"].selected {
+  border-color: #22c55e; background: rgba(34, 197, 94, 0.12);
+  color: var(--text-primary);
+}
+/* Medium = amber */
+.diff-opt[data-points="2"].selected {
+  border-color: #f59e0b; background: rgba(245, 158, 11, 0.12);
+  color: var(--text-primary);
+}
+/* Hard = orange */
+.diff-opt[data-points="3"].selected {
+  border-color: #f97316; background: rgba(249, 115, 22, 0.12);
+  color: var(--text-primary);
+}
+/* Critical = red */
+.diff-opt[data-points="5"].selected {
+  border-color: #ef4444; background: rgba(239, 68, 68, 0.12);
+  color: var(--text-primary);
+}
+
+/* ── Points Badge on Habit Card ── */
+.points-badge {
+  display: inline-flex; align-items: center;
+  padding: 1px 7px; border-radius: 20px;
+  font-size: 0.6rem; font-weight: 700;
+  font-family: var(--mono);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+  transition: var(--transition);
+}
+
+.habit-card.done .points-badge {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--success);
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
 /* Responsive */
 @media (max-width: 480px) {
   .app.main-content { padding: 12px 0 32px; }

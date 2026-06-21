@@ -54,12 +54,12 @@
 ];
 
   const DEFAULT_HABITS = [
-    { id: genId(), emoji: '📚', name: 'Read 10 pages', isNew: false, type: 'good' },
-    { id: genId(), emoji: '💪', name: 'Gym workout', isNew: false, type: 'good' },
-    { id: genId(), emoji: '🗣️', name: 'Table topic speech', isNew: false, type: 'good' },
-    { id: genId(), emoji: '💻', name: 'DevOps tutorials × 2', isNew: false, type: 'good' },
-    { id: genId(), emoji: '📝', name: '12 job applications', isNew: false, type: 'good' },
-    { id: genId(), emoji: '💼', name: 'Message 5 LinkedIn recruiters & comment on 2 posts', isNew: true, type: 'good' },
+    { id: genId(), emoji: '📚', name: 'Read 10 pages', isNew: false, type: 'good', points: 2 },
+    { id: genId(), emoji: '💪', name: 'Gym workout', isNew: false, type: 'good', points: 2 },
+    { id: genId(), emoji: '🗣️', name: 'Table topic speech', isNew: false, type: 'good', points: 2 },
+    { id: genId(), emoji: '💻', name: 'DevOps tutorials × 2', isNew: false, type: 'good', points: 3 },
+    { id: genId(), emoji: '📝', name: '12 job applications', isNew: false, type: 'good', points: 5 },
+    { id: genId(), emoji: '💼', name: 'Message 5 LinkedIn recruiters & comment on 2 posts', isNew: true, type: 'good', points: 3 },
   ];
 
   // ── State ──
@@ -129,6 +129,9 @@
     importFile: $('#importFile'),
     resetBtn: $('#resetBtn'),
     scoreRing: $('#scoreRing'),
+    pointsEarned: $('#pointsEarned'),
+    habitPoints: $('#habitPoints'),
+    diffOpts: $$('.diff-opt'),
     // Auth & Admin
     authBtn: $('#authBtn'),
     adminBtn: $('#adminBtn'),
@@ -254,6 +257,7 @@
         emoji: h.emoji,
         type: h.type,
         isNew: h.isNewHabit,
+        points: h.points || 1,
         repeatPattern: h.repeatPattern,
         selectedDays: h.selectedDays,
         intervalDays: h.intervalDays,
@@ -306,6 +310,11 @@
         const parsed = JSON.parse(raw);
         if (parsed.habits && parsed.completions) {
           parsed.tasks = parsed.tasks || {};
+          // Migrate: ensure all habits have a points value (default Easy = 1)
+          parsed.habits = parsed.habits.map(h => ({
+            points: 1,
+            ...h
+          }));
           return parsed;
         }
       }
@@ -357,13 +366,25 @@
     const key = dateKey(currentDate);
     const completions = state.completions[key] || {};
     const todayTasks = state.tasks[key] || [];
-    
+
     const activeHabits = state.habits.filter(h => shouldHabitAppearOnDate(h, currentDate));
     const total = activeHabits.length + todayTasks.length;
+
+    // Count-based (for displaying X/Y completed)
     let done = activeHabits.filter(h => getHabitScore(h, completions)).length;
     done += todayTasks.filter(t => t.isCompleted).length;
-    
-    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    // Points-based (for the score percentage)
+    const totalPoints = activeHabits.reduce((sum, h) => sum + (h.points || 1), 0)
+                      + todayTasks.reduce((sum, t) => sum + (t.points || 1), 0);
+    const earnedPoints = activeHabits
+                          .filter(h => getHabitScore(h, completions))
+                          .reduce((sum, h) => sum + (h.points || 1), 0)
+                       + todayTasks
+                          .filter(t => t.isCompleted)
+                          .reduce((sum, t) => sum + (t.points || 1), 0);
+
+    const pct = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
 
     animateValue(dom.scorePercent, pct, '%');
 
@@ -373,6 +394,7 @@
 
     dom.habitsTracked.textContent = total;
     dom.habitsCompleted.textContent = `${done}/${total}`;
+    if (dom.pointsEarned) dom.pointsEarned.textContent = `${earnedPoints}/${totalPoints} pts`;
 
     if (done === 0) {
       dom.statusText.textContent = 'Pending';
@@ -445,6 +467,7 @@
           ${habit.name}
           ${habit.isNew ? '<span class="new-badge">New</span>' : ''}
           ${isBad ? '<span class="bad-badge">Break</span>' : ''}
+          <span class="points-badge">${habit.points || 1} pt${(habit.points || 1) !== 1 ? 's' : ''}</span>
         </div>
         <div class="habit-status-label">${statusLabel}</div>
       </div>
@@ -725,12 +748,16 @@
     dom.habitName.value = '';
     dom.habitIsNew.checked = false;
     dom.habitEditId.value = '';
-    
+
     dom.habitRepeatPattern.value = 'every_day';
     dom.habitIntervalDays.value = '2';
     dom.habitStartDate.value = new Date().toISOString().split('T')[0];
     dom.dayOpts.forEach(opt => opt.checked = false);
     updateRepeatUI();
+
+    // Reset difficulty to Easy (1 pt)
+    dom.habitPoints.value = '1';
+    dom.diffOpts.forEach(b => b.classList.toggle('selected', b.dataset.points === '1'));
 
     setModalType('good');
     dom.habitModal.style.display = 'flex';
@@ -744,7 +771,7 @@
     dom.habitName.value = habit.name;
     dom.habitIsNew.checked = habit.isNew;
     dom.habitEditId.value = habit.id;
-    
+
     dom.habitRepeatPattern.value = habit.repeatPattern || 'every_day';
     dom.habitIntervalDays.value = habit.intervalDays || '2';
     if (habit.startDate) {
@@ -757,6 +784,11 @@
       opt.checked = days.includes(parseInt(opt.value, 10));
     });
     updateRepeatUI();
+
+    // Set difficulty selector to match saved points
+    const pts = String(habit.points || 1);
+    dom.habitPoints.value = pts;
+    dom.diffOpts.forEach(b => b.classList.toggle('selected', b.dataset.points === pts));
 
     setModalType(habit.type || 'good');
     dom.habitEmoji.value = habit.emoji;
@@ -778,7 +810,8 @@
     const emoji = dom.habitEmoji.value;
     const isNew = dom.habitIsNew.checked;
     const type = dom.habitType.value || 'good';
-    
+    const points = parseInt(dom.habitPoints.value, 10) || 1;
+
     const repeatPattern = dom.habitRepeatPattern.value;
     const intervalDays = parseInt(dom.habitIntervalDays.value, 10);
     const startDate = new Date(dom.habitStartDate.value);
@@ -792,9 +825,10 @@
         if (task) {
           task.name = name;
           task.emoji = emoji;
+          task.points = points;
         }
       } else {
-        state.tasks[key].push({ id: genId(), emoji, name, isCompleted: false });
+        state.tasks[key].push({ id: genId(), emoji, name, isCompleted: false, points });
       }
       saveState();
       closeModal();
@@ -823,13 +857,14 @@
               habit.emoji = emoji;
               habit.isNew = isNew;
               habit.type = type;
+              habit.points = points;
               habit.repeatPattern = repeatPattern;
               habit.selectedDays = selectedDays;
               habit.intervalDays = intervalDays;
               habit.startDate = startDate;
             }
           } else {
-            state.habits.push({ id: genId(), emoji, name, isNew, type, repeatPattern, selectedDays, intervalDays, startDate });
+            state.habits.push({ id: genId(), emoji, name, isNew, type, points, repeatPattern, selectedDays, intervalDays, startDate });
           }
           saveState();
           renderAll();
@@ -979,6 +1014,15 @@
         $$('.emoji-opt').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         dom.habitEmoji.value = btn.dataset.emoji;
+      });
+    });
+
+    // Difficulty selector
+    dom.diffOpts.forEach(btn => {
+      btn.addEventListener('click', () => {
+        dom.diffOpts.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        dom.habitPoints.value = btn.dataset.points;
       });
     });
 
@@ -1301,10 +1345,13 @@
     const key = dateKey(currentDate);
     const completions = state.completions[key] || {};
     const tasks = state.tasks[key] || [];
-    const goodHabits = state.habits.filter(h => h.type !== 'bad');
-    const badHabits = state.habits.filter(h => h.type === 'bad');
-    const total = state.habits.length + tasks.length;
-    let done = state.habits.filter(h => getHabitScore(h, completions)).length;
+
+    // Fix: filter habits by the current date (same as the dashboard) to prevent count mismatch
+    const activeHabits = state.habits.filter(h => shouldHabitAppearOnDate(h, currentDate));
+    const goodHabits = activeHabits.filter(h => h.type !== 'bad');
+    const badHabits = activeHabits.filter(h => h.type === 'bad');
+    const total = activeHabits.length + tasks.length;
+    let done = activeHabits.filter(h => getHabitScore(h, completions)).length;
     done += tasks.filter(t => t.isCompleted).length;
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
@@ -1316,27 +1363,29 @@
     const todayKey = dateKey(today);
     const todayCompletions = state.completions[todayKey] || {};
     const todayTasks = state.tasks[todayKey] || [];
-    const todayDone = state.habits.every(h => getHabitScore(h, todayCompletions)) &&
+    const todayActiveHabits = state.habits.filter(h => shouldHabitAppearOnDate(h, today));
+    const todayDone = todayActiveHabits.every(h => getHabitScore(h, todayCompletions)) &&
                       (todayTasks.length === 0 || todayTasks.every(t => t.isCompleted));
     if (!todayDone) checkDate.setDate(checkDate.getDate() - 1);
     while (true) {
       const k = dateKey(checkDate);
       const c = state.completions[k] || {};
       const t = state.tasks[k] || [];
-      const allDone = state.habits.length > 0 && state.habits.every(h => getHabitScore(h, c)) &&
+      const habitsOnDay = state.habits.filter(h => shouldHabitAppearOnDate(h, checkDate));
+      const allDone = habitsOnDay.length > 0 && habitsOnDay.every(h => getHabitScore(h, c)) &&
                       (t.length === 0 || t.every(x => x.isCompleted));
       if (!allDone) break;
       streak++;
       checkDate.setDate(checkDate.getDate() - 1);
     }
-    if (todayDone && state.habits.length > 0) streak++;
+    if (todayDone && todayActiveHabits.length > 0) streak++;
 
     return {
       total, done, pct, streak,
       goodCount: goodHabits.length,
       badCount: badHabits.length,
       goodHabits, badHabits,
-      habitNames: state.habits.map(h => h.name),
+      habitNames: activeHabits.map(h => h.name),
       tasks
     };
   }
