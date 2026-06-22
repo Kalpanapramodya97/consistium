@@ -27,6 +27,27 @@ groups:
             Runbook: https://github.com/Kalpanapramodya97/consistium/wiki/runbooks/service-down
           dashboard_url: "http://localhost:3001/d/consistium-main"
 
+      # -------------------------------------------------------
+      # Alert: FrontendDown
+      # Fires when the nginx-exporter reports that the underlying
+      # Nginx server (consistium) is unreachable.
+      # Severity: critical
+      # -------------------------------------------------------
+      - alert: FrontendDown
+        expr: nginx_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "🔴 Frontend App DOWN"
+          description: |
+            The Nginx exporter reports that the consistium frontend is unreachable.
+            
+            Action: Check container health → docker compose ps consistium
+            Runbook: https://github.com/Kalpanapramodya97/consistium/wiki/runbooks/frontend-down
+          dashboard_url: "http://localhost:3001/d/consistium-main"
+
   # ============================================================
   # GROUP 2: HTTP Error Rate
   # ============================================================
