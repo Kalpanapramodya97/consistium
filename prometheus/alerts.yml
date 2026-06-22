@@ -1,0 +1,286 @@
+groups:
+  # ============================================================
+  # GROUP 1: Service Availability
+  # ============================================================
+  - name: service_availability
+    interval: 30s
+    rules:
+      # -------------------------------------------------------
+      # Alert: ServiceDown
+      # Fires when any Prometheus scrape target has been
+      # unreachable for more than 1 minute.
+      # Severity: critical — triggers immediate email.
+      # -------------------------------------------------------
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "🔴 Service DOWN: {{ $labels.job }}"
+          description: |
+            The scrape target '{{ $labels.job }}' on instance '{{ $labels.instance }}'
+            has been unreachable for more than 1 minute.
+
+            Action: Check container health → docker compose ps
+            Runbook: https://github.com/Kalpanapramodya97/consistium/wiki/runbooks/service-down
+          dashboard_url: "http://localhost:3001/d/consistium-main"
+
+  # ============================================================
+  # GROUP 2: HTTP Error Rate
+  # ============================================================
+  - name: http_errors
+    interval: 30s
+    rules:
+      # -------------------------------------------------------
+      # Alert: HighErrorRate
+      # Fires when the 5xx HTTP error rate exceeds 5% of all
+      # requests over a 2-minute window.
+      # Severity: critical
+      # -------------------------------------------------------
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(nginx_http_requests_total{status=~"5.."}[2m]))
+            /
+            sum(rate(nginx_http_requests_total[2m]))
+          ) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "🔴 High HTTP Error Rate: {{ $value | printf \"%.1f\" }}%"
+          description: |
+            The HTTP 5xx error rate has exceeded 5% for the past 2 minutes.
+            Current rate: {{ $value | printf "%.2f" }}%
+
+            Action: Check application logs → docker compose logs backend
+            Runbook: https://github.com/Kalpanapramodya97/consistium/wiki/runbooks/high-error-rate
+          dashboard_url: "http://localhost:3001/d/consistium-main"
+
+      # -------------------------------------------------------
+      # Alert: HighClientErrorRate
+      # Fires when 4xx rate exceeds 20% (possible misconfiguration
+      # or attack surface).
+      # Severity: warning
+      # -------------------------------------------------------
+      - alert: HighClientErrorRate
+        expr: |
+          (
+            sum(rate(nginx_http_requests_total{status=~"4.."}[5m]))
+            /
+            sum(rate(nginx_http_requests_total[5m]))
+          ) * 100 > 20
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "🟡 High Client Error Rate (4xx): {{ $value | printf \"%.1f\" }}%"
+          description: |
+            The HTTP 4xx error rate has exceeded 20% for the past 5 minutes.
+            Current rate: {{ $value | printf "%.2f" }}%
+
+            This may indicate bad client requests, misconfigured routes,
+            or an ongoing enumeration/scanning attack.
+          dashboard_url: "http://localhost:3001/d/consistium-main"
+
+  # ============================================================
+  # GROUP 3: Latency / Performance
+  # ============================================================
+  - name: latency
+    interval: 30s
+    rules:
+      # -------------------------------------------------------
+      # Alert: SlowLatency
+      # Fires when the p95 request latency exceeds 500ms.
+      # Based on nginx_http_request_duration_seconds histogram.
+      # Severity: warning
+      # -------------------------------------------------------
+      - alert: SlowLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(nginx_http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "🟡 Slow p95 Latency: {{ $value | printf \"%.3f\" }}s"
+          description: |
+            The 95th-percentile HTTP response time has been above 500ms
+            for the last 5 minutes.
+            Current p95: {{ $value | printf "%.3f" }}s
+
+            Action: Profile the backend, check MongoDB query times.
+            Runbook: https://github.com/Kalpanapramodya97/consistium/wiki/runbooks/slow-latency
+          dashboard_url: "http://localhost:3001/d/consistium-main"
+
+  # ============================================================
+  # GROUP 4: Resource Usage
+  # ============================================================
+  - name: resource_usage
+    interval: 60s
+    rules:
+      # -------------------------------------------------------
+      # Alert: HighMemoryUsage
+      # Fires when any container's memory usage exceeds 85%
+      # of its configured limit.
+      # Severity: warning
+      # -------------------------------------------------------
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            container_memory_usage_bytes{name!=""}
+            /
+            container_spec_memory_limit_bytes{name!=""}
+          ) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "🟡 High Memory: {{ $labels.name }} at {{ $value | printf \"%.0f\" }}%"
+          description: |
+            Container '{{ $labels.name }}' has been using more than 85% of its
+            memory limit for the past 5 minutes.
+            Current usage: {{ $value | printf "%.1f" }}%
+
+            Action: Review container memory limits or check for memory leaks.
+            Runbook: https://github.com/Kalpanapramodya97/consistium/wiki/runbooks/high-memory
+          dashboard_url: "http://localhost:3001/d/consistium-main"
+
+      # -------------------------------------------------------
+      # Alert: HighCPUUsage
+      # Fires when container CPU usage exceeds 80% averaged
+      # over a 5-minute window.
+      # Severity: warning
+      # -------------------------------------------------------
+      - alert: HighCPUUsage
+        expr: |
+          (
+            sum(rate(container_cpu_usage_seconds_total{name!=""}[5m])) by (name)
+            /
+            sum(container_spec_cpu_quota{name!=""} / container_spec_cpu_period{name!=""}) by (name)
+          ) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "🟡 High CPU: {{ $labels.name }} at {{ $value | printf \"%.0f\" }}%"
+          description: |
+            Container '{{ $labels.name }}' has been consuming more than 80% of its
+            CPU quota for the past 5 minutes.
+            Current usage: {{ $value | printf "%.1f" }}%
+
+            Action: Scale the service or investigate CPU-intensive operations.
+            Runbook: https://github.com/Kalpanapramodya97/consistium/wiki/runbooks/high-cpu
+          dashboard_url: "http://localhost:3001/d/consistium-main"
+
+      # -------------------------------------------------------
+      # Alert: DiskSpaceLow
+      # Fires when host filesystem usage exceeds 85%.
+      # Severity: warning → critical at 95%
+      # -------------------------------------------------------
+      - alert: DiskSpaceLow
+        expr: |
+          (
+            (node_filesystem_size_bytes{fstype!~"tmpfs|overlay"} - node_filesystem_free_bytes{fstype!~"tmpfs|overlay"})
+            /
+            node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}
+          ) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "🟡 Disk Space Low on {{ $labels.mountpoint }}: {{ $value | printf \"%.0f\" }}% used"
+          description: |
+            Filesystem '{{ $labels.mountpoint }}' is {{ $value | printf "%.1f" }}% full.
+            Free space is critically low — Docker volume writes may fail soon.
+
+            Action: Clean up old images → docker image prune -af
+          dashboard_url: "http://localhost:3001/d/consistium-main"
+
+  # ============================================================
+  # GROUP 5: Security Alerts
+  # ============================================================
+  - name: security
+    interval: 30s
+    rules:
+      # -------------------------------------------------------
+      # Alert: AuthBruteForce
+      # Fires when there are more than 50 failed authentication
+      # attempts in a 5-minute window — possible brute force.
+      # Uses Loki-exported metric (requires Loki ruler or
+      # log-based counter metric from promtail).
+      # Severity: critical
+      # -------------------------------------------------------
+      - alert: AuthBruteForce
+        expr: |
+          sum(increase(nginx_http_requests_total{status="401"}[5m])) > 50
+        for: 0m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "🔴 Auth Brute Force Detected: {{ $value | printf \"%.0f\" }} failures in 5m"
+          description: |
+            More than 50 HTTP 401 (Unauthorized) responses have been recorded
+            in the last 5 minutes. This may indicate a brute-force login attack.
+
+            Current count: {{ $value | printf "%.0f" }} failed auth attempts
+
+            Action: Review Nginx access logs, block offending IPs.
+            Runbook: https://github.com/Kalpanapramodya97/consistium/wiki/runbooks/brute-force
+          dashboard_url: "http://localhost:3001/d/consistium-main"
+
+      # -------------------------------------------------------
+      # Alert: NginxHighActiveConnections
+      # Fires when Nginx active connections exceed 500 —
+      # potential traffic spike or DDoS.
+      # Severity: warning
+      # -------------------------------------------------------
+      - alert: NginxHighActiveConnections
+        expr: nginx_connections_active > 500
+        for: 2m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "🟡 Nginx High Connections: {{ $value }} active"
+          description: |
+            Nginx currently has {{ $value }} active connections — exceeding the
+            threshold of 500. This may indicate a traffic spike or DDoS attack.
+
+            Action: Review Nginx access logs and rate-limit configuration.
+          dashboard_url: "http://localhost:3001/d/consistium-main"
+
+  # ============================================================
+  # GROUP 6: Watchdog (Dead Man's Switch)
+  # ============================================================
+  - name: watchdog
+    rules:
+      # -------------------------------------------------------
+      # Alert: Watchdog
+      # This alert is always firing. Alertmanager routes it to
+      # a "watchdog" receiver that sends a heartbeat email.
+      # If you stop receiving heartbeat emails, the alerting
+      # pipeline itself is broken.
+      # -------------------------------------------------------
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+          team: devops
+        annotations:
+          summary: "💚 Alerting Pipeline Heartbeat"
+          description: |
+            This alert always fires. It is used to verify that the entire
+            alerting pipeline (Prometheus → Alertmanager → Email) is working.
+            If you stop receiving this email, investigate immediately.

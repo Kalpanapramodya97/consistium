@@ -1,0 +1,104 @@
+global:
+  # ── How long to wait before sending a notification after an alert fires ──
+  resolve_timeout: 5m
+
+  # ── SMTP / Email configuration ──────────────────────────────────────────
+  # Replace these with your actual Gmail credentials (use an App Password,
+  # NOT your real Gmail password). Store secrets in docker-compose .env file.
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'Consistium DevOps <kalpanapramodya97@gmail.com>'
+  smtp_auth_username: 'kalpanapramodya97@gmail.com'
+  smtp_auth_password: '${SMTP_PASSWORD}'   # loaded from .env via docker compose
+  smtp_require_tls: true                   # port 587 uses STARTTLS
+
+# ── Email templates ──────────────────────────────────────────────────────────
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# ── Top-level route ─────────────────────────────────────────────────────────
+# All alerts enter here; sub-routes match by label.
+route:
+  receiver: 'devops-email'          # default receiver (fallback)
+  group_by: ['alertname', 'job']    # group alerts with same name+job together
+  group_wait: 30s                   # wait before sending first notification
+  group_interval: 5m                # wait before sending updated notification
+  repeat_interval: 4h               # re-notify if still firing after this time
+
+  routes:
+    # ── CRITICAL: immediate email, repeat every 1h ─────────────────────────
+    - matchers:
+        - severity="critical"
+      receiver: 'devops-email-critical'
+      group_wait: 0s               # fire immediately on critical
+      repeat_interval: 1h
+
+    # ── SECURITY team: brute-force / security alerts ───────────────────────
+    - matchers:
+        - team="security"
+      receiver: 'security-email'
+      group_wait: 0s
+      repeat_interval: 30m
+
+    # ── WARNING: grouped, less frequent ───────────────────────────────────
+    - matchers:
+        - severity="warning"
+      receiver: 'devops-email'
+      group_wait: 1m
+      repeat_interval: 6h
+
+    # ── WATCHDOG: heartbeat — send to a separate receiver ─────────────────
+    - matchers:
+        - alertname="Watchdog"
+      receiver: 'watchdog-email'
+      repeat_interval: 24h          # one heartbeat email per day
+
+# ── Inhibition rules ─────────────────────────────────────────────────────────
+# Suppress 'warning' alerts when the same job/instance already has a 'critical'
+# alert firing — avoids email flood when a service is already known to be down.
+inhibit_rules:
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal:
+      - job
+      - instance
+
+# ── Receivers ────────────────────────────────────────────────────────────────
+receivers:
+
+  # ── Default DevOps receiver (warnings, info) ──────────────────────────────
+  - name: 'devops-email'
+    email_configs:
+      - to: 'kalpanapramodya97@gmail.com'
+        send_resolved: true
+        html: '{{ template "email.devops.html" . }}'
+        headers:
+          Subject: '🟡 [Consistium Warning] {{ .GroupLabels.alertname }}'
+
+  # ── Critical receiver (immediate, includes all details) ───────────────────
+  - name: 'devops-email-critical'
+    email_configs:
+      - to: 'kalpanapramodya97@gmail.com'
+        send_resolved: true
+        html: '{{ template "email.devops.html" . }}'
+        headers:
+          Subject: '🔴 [CRITICAL] {{ .GroupLabels.alertname }} — Consistium'
+
+  # ── Security receiver ─────────────────────────────────────────────────────
+  - name: 'security-email'
+    email_configs:
+      - to: 'kalpanapramodya97@gmail.com'
+        send_resolved: true
+        html: '{{ template "email.devops.html" . }}'
+        headers:
+          Subject: '🚨 [SECURITY ALERT] {{ .GroupLabels.alertname }} — Consistium'
+
+  # ── Watchdog heartbeat ─────────────────────────────────────────────────────
+  - name: 'watchdog-email'
+    email_configs:
+      - to: 'kalpanapramodya97@gmail.com'
+        send_resolved: false        # don't send a "resolved" for the heartbeat
+        html: '{{ template "email.watchdog.html" . }}'
+        headers:
+          Subject: '💚 [Consistium] Alerting Pipeline Heartbeat'

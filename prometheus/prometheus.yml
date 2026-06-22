@@ -1,7 +1,56 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s   # How often to evaluate alert rules
+  external_labels:
+    monitor: 'consistium'
+    environment: 'production'
 
+# ── Alertmanager integration ──────────────────────────────────────────────────
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# ── Alert rule files ──────────────────────────────────────────────────────────
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+# ── Scrape targets ────────────────────────────────────────────────────────────
 scrape_configs:
+  # Nginx metrics via nginx-prometheus-exporter
   - job_name: 'nginx'
     static_configs:
       - targets: ['nginx-exporter:9113']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'consistium-nginx'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'prometheus'
+
+  # Alertmanager self-monitoring
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'alertmanager'
+
+  # Backend Node.js API — exposes /api/metrics (prom-client)
+  - job_name: 'backend'
+    static_configs:
+      - targets: ['backend:5000']
+    metrics_path: /api/metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'consistium-backend'

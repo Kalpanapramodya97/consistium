@@ -17,3 +17,6 @@ node_modules/
 consistium-security-report.html
 trufflehog.json
 trivy-fs.json
+
+# Secrets — never commit these
+.env
