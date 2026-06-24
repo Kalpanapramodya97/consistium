@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const { metricsMiddleware, metricsHandler } = require('./middleware/metrics');
 
 // Load environment variables
 dotenv.config();
@@ -12,6 +13,10 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// ── Prometheus instrumentation ────────────────────────────────────────────────
+// Must be registered BEFORE routes so every request is measured.
+app.use(metricsMiddleware);
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/consistium';
@@ -36,11 +41,17 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Consistium API is running' });
 });
 
+// ── Prometheus metrics endpoint ───────────────────────────────────────────────
+// Scraped by Prometheus every 15 s (see prometheus/prometheus.yml).
+app.get('/api/metrics', metricsHandler);
+
 // Start Server
 if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📊 Metrics available at http://localhost:${PORT}/api/metrics`);
   });
 }
 
 module.exports = app;
+

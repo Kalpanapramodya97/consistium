@@ -1,0 +1,236 @@
+groups:
+  # ============================================================
+  # SLO RECORDING RULES — Consistium
+  # ============================================================
+  # These rules pre-compute expensive expressions into cheap
+  # instant-vector metrics, making Grafana dashboards fast and
+  # keeping alert rule expressions simple.
+  #
+  # SLO Targets:
+  #   Availability  → 99.5 % uptime  (error budget: 0.5 %)
+  #   Latency       → 95 % of requests served under 500 ms
+  # ============================================================
+
+  # ── Availability SLO ─────────────────────────────────────────
+  - name: slo:availability
+    interval: 30s
+    rules:
+      # Raw 5-minute HTTP request rate (good + bad combined)
+      - record: job:http_requests_total:rate5m
+        expr: sum(rate(nginx_http_requests_total[5m]))
+
+      # Raw 5-minute HTTP 5xx error rate
+      - record: job:http_requests_5xx:rate5m
+        expr: sum(rate(nginx_http_requests_total{status=~"5.."}[5m]))
+
+      # Ratio: 5xx errors / total requests over 5-minute window
+      # Used for short-window burn-rate alerts
+      - record: job:http_error_ratio:rate5m
+        expr: |
+          job:http_requests_5xx:rate5m
+          /
+          clamp_min(job:http_requests_total:rate5m, 1)
+
+      # Ratio over 1-hour window — smoother, for SLO trend panels
+      - record: job:http_error_ratio:rate1h
+        expr: |
+          sum(rate(nginx_http_requests_total{status=~"5.."}[1h]))
+          /
+          clamp_min(sum(rate(nginx_http_requests_total[1h])), 1)
+
+      # Ratio over 6-hour window — for medium-term burn-rate
+      - record: job:http_error_ratio:rate6h
+        expr: |
+          sum(rate(nginx_http_requests_total{status=~"5.."}[6h]))
+          /
+          clamp_min(sum(rate(nginx_http_requests_total[6h])), 1)
+
+      # Ratio over 1-day window — used in daily SLO compliance panel
+      - record: job:http_error_ratio:rate1d
+        expr: |
+          sum(rate(nginx_http_requests_total{status=~"5.."}[1d]))
+          /
+          clamp_min(sum(rate(nginx_http_requests_total[1d])), 1)
+
+      # Current availability (%) over the last hour
+      # = 1 - error_ratio  →  expressed as percentage
+      - record: job:slo_availability_pct:rate1h
+        expr: (1 - job:http_error_ratio:rate1h) * 100
+
+      # Current availability (%) over the last day
+      - record: job:slo_availability_pct:rate1d
+        expr: (1 - job:http_error_ratio:rate1d) * 100
+
+      # Error budget remaining (%) — 30-day window
+      # SLO target = 99.5 %  →  error budget = 0.5 %
+      # Consumed budget = error_ratio_30d / 0.005
+      # Remaining       = 1 - consumed
+      - record: job:slo_error_budget_remaining_pct:rate30d
+        expr: |
+          (
+            1 - (
+              sum(rate(nginx_http_requests_total{status=~"5.."}[30d]))
+              /
+              clamp_min(sum(rate(nginx_http_requests_total[30d])), 1)
+            ) / 0.005
+          ) * 100
+
+      # Fast burn-rate flag (5-minute window exceeds 14× budget)
+      # Fires when we are burning the monthly budget 14× faster than allowed
+      - record: job:slo_fast_burn:bool
+        expr: job:http_error_ratio:rate5m > (14 * 0.005)
+
+      # Slow burn-rate flag (1-hour window exceeds 2× budget)
+      - record: job:slo_slow_burn:bool
+        expr: job:http_error_ratio:rate1h > (2 * 0.005)
+
+  # ── Latency SLO ──────────────────────────────────────────────
+  - name: slo:latency
+    interval: 30s
+    rules:
+      # p50 latency — 5-minute window (backend prom-client histogram)
+      - record: job:http_request_duration_p50:rate5m
+        expr: |
+          histogram_quantile(
+            0.50,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          )
+
+      # p95 latency — 5-minute window
+      - record: job:http_request_duration_p95:rate5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          )
+
+      # p99 latency — 5-minute window
+      - record: job:http_request_duration_p99:rate5m
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          )
+
+      # p95 latency — 1-hour window (for trend panel)
+      - record: job:http_request_duration_p95:rate1h
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_request_duration_seconds_bucket[1h])) by (le)
+          )
+
+      # Latency SLO compliance ratio:
+      # Fraction of requests that completed under 500 ms (le="0.5" bucket)
+      # SLO target: ≥ 95 % of requests under 500 ms
+      - record: job:slo_latency_compliance_pct:rate5m
+        expr: |
+          (
+            sum(rate(http_request_duration_seconds_bucket{le="0.5"}[5m]))
+            /
+            clamp_min(sum(rate(http_request_duration_seconds_count[5m])), 1)
+          ) * 100
+
+  # ── Backend API metrics ───────────────────────────────────────
+  - name: slo:backend
+    interval: 30s
+    rules:
+      # Total API request rate (all routes)
+      - record: job:api_requests_total:rate5m
+        expr: sum(rate(http_requests_total[5m])) by (route, method, status)
+
+      # API 5xx error rate per route — helps pinpoint which endpoint is failing
+      - record: job:api_error_ratio_by_route:rate5m
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) by (route)
+          /
+          clamp_min(sum(rate(http_requests_total[5m])) by (route), 1)
+
+      # Nginx connection saturation — ratio of active to waiting connections
+      - record: job:nginx_connection_saturation:instant
+        expr: |
+          nginx_connections_active
+          /
+          clamp_min(nginx_connections_active + nginx_connections_waiting, 1)
+
+  # ── SLO Burn-Rate Alerts ──────────────────────────────────────
+  # These are alert rules (not recording rules) that fire based
+  # on the pre-computed recording rules above, keeping the
+  # alert expressions clean and fast.
+  - name: slo:alerts
+    rules:
+      # Fast burn: consuming monthly error budget at 14× rate
+      # This is a page-level alert — act within the hour
+      - alert: SLOErrorBudgetFastBurn
+        expr: job:slo_fast_burn:bool == 1
+        for: 2m
+        labels:
+          severity: critical
+          team: devops
+          slo: availability
+        annotations:
+          summary: "🔴 SLO Fast Burn — Error budget burning 14× faster than target"
+          description: |
+            The 5-minute HTTP error rate is {{ $value | printf "%.3f" }} ({{ $value | printf "%.1f" }}×
+            the SLO budget rate of 0.005). At this rate the monthly error budget will
+            be exhausted within hours.
+
+            Action: Immediately check backend logs and rollback if a recent deploy is suspected.
+            Runbook: https://github.com/Kalpanapramodya97/consistium/wiki/runbooks/slo-fast-burn
+          dashboard_url: "http://localhost:3001/d/consistium-slo"
+
+      # Slow burn: consuming error budget at 2× rate over 1 hour
+      # Warning — investigate within the next few hours
+      - alert: SLOErrorBudgetSlowBurn
+        expr: job:slo_slow_burn:bool == 1
+        for: 15m
+        labels:
+          severity: warning
+          team: devops
+          slo: availability
+        annotations:
+          summary: "🟡 SLO Slow Burn — Error budget burning 2× faster than expected"
+          description: |
+            The 1-hour HTTP error rate is {{ $value | printf "%.4f" }}, which is double
+            the expected budget burn rate. The monthly error budget may be exhausted
+            before month-end if this continues.
+
+            Action: Investigate backend errors and recent deployments.
+            Runbook: https://github.com/Kalpanapramodya97/consistium/wiki/runbooks/slo-slow-burn
+          dashboard_url: "http://localhost:3001/d/consistium-slo"
+
+      # Latency SLO breach: fewer than 95 % of requests under 500 ms
+      - alert: SLOLatencyBreach
+        expr: job:slo_latency_compliance_pct:rate5m < 95
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+          slo: latency
+        annotations:
+          summary: "🟡 Latency SLO Breach — {{ $value | printf \"%.1f\" }}% of requests under 500ms (target: 95%)"
+          description: |
+            Only {{ $value | printf "%.1f" }}% of API requests are completing within the 500 ms
+            SLO target over the last 5 minutes. The SLO target is 95%.
+
+            Action: Profile slow routes, check MongoDB query performance.
+            Runbook: https://github.com/Kalpanapramodya97/consistium/wiki/runbooks/slo-latency
+          dashboard_url: "http://localhost:3001/d/consistium-slo"
+
+      # Error budget critically low: less than 10 % remaining for the month
+      - alert: SLOErrorBudgetCriticallyLow
+        expr: job:slo_error_budget_remaining_pct:rate30d < 10
+        for: 0m
+        labels:
+          severity: critical
+          team: devops
+          slo: availability
+        annotations:
+          summary: "🔴 SLO Error Budget Critically Low — {{ $value | printf \"%.1f\" }}% remaining"
+          description: |
+            The 30-day rolling error budget for the Availability SLO is almost exhausted.
+            Only {{ $value | printf "%.1f" }}% of the 0.5% monthly error budget remains.
+
+            Action: Freeze non-critical deployments, focus on stability.
+            Runbook: https://github.com/Kalpanapramodya97/consistium/wiki/runbooks/slo-budget-low
+          dashboard_url: "http://localhost:3001/d/consistium-slo"
