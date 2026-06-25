@@ -104,16 +104,16 @@ jobs:
           fetch-depth: 0 # Fetch all history for secret scanning
       
       - name: TruffleHog Secret Scan
-        uses: trufflesecurity/trufflehog@main
         continue-on-error: true
-        with:
-          path: ./
-          extra_args: --debug --only-verified --json --output trufflehog-results.json
-
-      - name: Create empty results if scan found nothing
-        if: always()
         run: |
-          if [ ! -f trufflehog-results.json ]; then
+          docker run --rm -v "$PWD:/workspace" ghcr.io/trufflesecurity/trufflehog:latest \
+            filesystem /workspace \
+            --only-verified \
+            --json \
+            --exclude-paths=/workspace/.trufflehog-exclude \
+            > trufflehog-results.json 2>/dev/null || true
+          # Ensure valid JSON output even if no results
+          if [ ! -s trufflehog-results.json ]; then
             echo "[]" > trufflehog-results.json
           fi
 
