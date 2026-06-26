@@ -31,9 +31,11 @@ if (require.main === module) {
 const authRoutes = require('./routes/auth');
 const habitRoutes = require('./routes/habits');
 const adminRoutes = require('./routes/admin');
+const disciplineRoutes = require('./routes/discipline');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/habits', habitRoutes);
+app.use('/api/discipline-stats', disciplineRoutes.router);
 app.use('/api/admin', adminRoutes);
 
 // Health check endpoint

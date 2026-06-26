@@ -99,7 +99,6 @@
     quoteAuthor: $('#quoteAuthor'),
     prevQuote: $('#prevQuote'),
     nextQuote: $('#nextQuote'),
-    streakCount: $('#streakCount'),
     addHabitBtn: $('#addHabitBtn'),
     habitModal: $('#habitModal'),
     modalTitle: $('#modalTitle'),
@@ -153,7 +152,15 @@
     adminTotalUsers: $('#adminTotalUsers'),
     adminTotalHabits: $('#adminTotalHabits'),
     adminTotalCompletions: $('#adminTotalCompletions'),
-    adminUserList: $('#adminUserList')
+    adminUserList: $('#adminUserList'),
+    // Discipline
+    disciplineSection: $('#disciplineSection'),
+    disciplineLevelName: $('#disciplineLevelName'),
+    disciplineCurrentStreak: $('#disciplineCurrentStreak'),
+    disciplineLongestStreak: $('#disciplineLongestStreak'),
+    disciplineTotalDays: $('#disciplineTotalDays'),
+    disciplineProgressText: $('#disciplineProgressText'),
+    disciplineProgressFill: $('#disciplineProgressFill')
   };
 
   // ── Helpers ──
@@ -273,9 +280,132 @@
       });
 
       renderAll();
+      fetchAndRenderDisciplineStats();
     } catch (e) {
       console.error('Sync failed', e);
     }
+  }
+
+  async function fetchAndRenderDisciplineStats() {
+    if (!dom.disciplineSection) return;
+    
+    let stats;
+    if (authToken) {
+      try {
+        const todayKey = dateKey(new Date());
+        stats = await apiFetch(`/discipline-stats?today=${todayKey}`);
+      } catch (e) {
+        console.error('Failed to fetch discipline stats', e);
+        return;
+      }
+    } else {
+      stats = calculateLocalDisciplineStats();
+    }
+      
+    dom.disciplineSection.style.display = 'block';
+    dom.disciplineLevelName.textContent = stats.currentLevel.name;
+    dom.disciplineCurrentStreak.textContent = stats.currentStreak;
+    dom.disciplineLongestStreak.textContent = stats.longestStreak;
+    dom.disciplineTotalDays.textContent = stats.totalPerfectDays;
+    
+    if (stats.nextLevel) {
+      dom.disciplineProgressText.textContent = `${stats.daysToNextLevel} more perfect days to become ${stats.nextLevel.name}`;
+      dom.disciplineProgressFill.style.width = `${stats.progressPercent}%`;
+    } else {
+      dom.disciplineProgressText.textContent = `Max level reached! You are a legend.`;
+      dom.disciplineProgressFill.style.width = `100%`;
+    }
+  }
+
+  function calculateLocalDisciplineStats() {
+    const LEVELS = [
+      { name: 'Beginner', requiredStreak: 0 },
+      { name: 'Discipline Guy', requiredStreak: 3 },
+      { name: 'Consistent Guy', requiredStreak: 7 },
+      { name: 'Ultra Discipline Guy', requiredStreak: 14 },
+      { name: 'Iron Mind', requiredStreak: 30 },
+      { name: 'Beast Mode', requiredStreak: 60 },
+      { name: 'Legend', requiredStreak: 100 }
+    ];
+
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let totalPerfectDays = 0;
+
+    const habits = state.habits;
+    const completionsMap = state.completions;
+    const today = new Date();
+    const todayKey = dateKey(today);
+
+    let earliestDateKey = todayKey;
+    Object.keys(completionsMap).forEach(key => {
+      if (key < earliestDateKey) earliestDateKey = key;
+    });
+    habits.forEach(h => {
+      if (h.startDate) {
+        const sd = new Date(h.startDate);
+        const y = sd.getFullYear();
+        const m = String(sd.getMonth() + 1).padStart(2, '0');
+        const d = String(sd.getDate()).padStart(2, '0');
+        const dKey = `${y}-${m}-${d}`;
+        if (dKey < earliestDateKey) earliestDateKey = dKey;
+      }
+    });
+
+    if (habits.length > 0) {
+      const end = new Date(today);
+      resetToMidnight(end);
+      let current = new Date(earliestDateKey);
+      resetToMidnight(current);
+
+      while (current <= end) {
+        const dKey = dateKey(current);
+        const activeHabits = habits.filter(h => shouldHabitAppearOnDate(h, current));
+        
+        if (activeHabits.length === 0) {
+          current.setDate(current.getDate() + 1);
+          continue;
+        }
+
+        let isPerfect = activeHabits.every(h => {
+          const isCompleted = completionsMap[dKey] && completionsMap[dKey][h.id];
+          if (h.type === 'bad') return !isCompleted;
+          return !!isCompleted;
+        });
+
+        if (isPerfect) {
+          currentStreak++;
+          totalPerfectDays++;
+          if (currentStreak > longestStreak) longestStreak = currentStreak;
+        } else {
+          if (dKey !== todayKey) currentStreak = 0;
+        }
+
+        current.setDate(current.getDate() + 1);
+      }
+    }
+
+    let currentLevel = LEVELS[0];
+    let nextLevel = LEVELS[1];
+    for (let i = 0; i < LEVELS.length; i++) {
+      if (currentStreak >= LEVELS[i].requiredStreak) {
+        currentLevel = LEVELS[i];
+        nextLevel = i + 1 < LEVELS.length ? LEVELS[i + 1] : null;
+      }
+    }
+
+    let daysToNextLevel = 0;
+    let progressPercent = 100;
+    if (nextLevel) {
+      daysToNextLevel = nextLevel.requiredStreak - currentStreak;
+      const prevReq = currentLevel.requiredStreak;
+      const totalReq = nextLevel.requiredStreak - prevReq;
+      progressPercent = Math.round(((currentStreak - prevReq) / totalReq) * 100);
+    }
+
+    return {
+      currentStreak, longestStreak, totalPerfectDays, currentLevel, nextLevel, daysToNextLevel, progressPercent
+    };
   }
 
   function logout() {
@@ -284,6 +414,7 @@
     localStorage.removeItem('consistium_token');
     state = { habits: DEFAULT_HABITS, completions: {}, tasks: {} };
     dom.adminBtn.style.display = 'none';
+    if (dom.disciplineSection) dom.disciplineSection.style.display = 'none';
     renderAll();
     updateAuthUI();
   }
@@ -556,43 +687,6 @@
     dom.specialTasksHeader.style.display = tasks.length ? 'flex' : 'none';
   }
 
-  function renderStreak() {
-    let streak = 0;
-    const today = new Date();
-    resetToMidnight(today);
-
-    // Count backwards from today (or yesterday if today isn't complete)
-    const checkDate = new Date(today);
-    const todayKey = dateKey(today);
-    const todayCompletions = state.completions[todayKey] || {};
-    const todayTasks = state.tasks[todayKey] || [];
-    const todayActiveHabits = state.habits.filter(h => shouldHabitAppearOnDate(h, today));
-    const todayDone = todayActiveHabits.every(h => getHabitScore(h, todayCompletions)) &&
-                      (todayTasks.length === 0 || todayTasks.every(t => t.isCompleted));
-
-    if (!todayDone) {
-      checkDate.setDate(checkDate.getDate() - 1);
-    }
-
-    while (true) {
-      const key = dateKey(checkDate);
-      const completions = state.completions[key] || {};
-      const tasks = state.tasks[key] || [];
-      const activeHabits = state.habits.filter(h => shouldHabitAppearOnDate(h, checkDate));
-      const hasHabits = activeHabits.length > 0;
-      const allDone = hasHabits && activeHabits.every(h => getHabitScore(h, completions)) &&
-                      (tasks.length === 0 || tasks.every(t => t.isCompleted));
-      if (!allDone) break;
-      streak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    }
-
-    // Include today if all done
-    if (todayDone && state.habits.filter(h => shouldHabitAppearOnDate(h, today)).length > 0) streak++;
-
-    dom.streakCount.textContent = streak;
-  }
-
   function renderWeeklyHeatmap() {
     dom.weeklyHeatmap.innerHTML = '';
     const today = new Date();
@@ -664,9 +758,9 @@
     renderDate();
     renderHabits();
     renderScore();
-    renderStreak();
     renderWeeklyHeatmap();
     renderQuote();
+    fetchAndRenderDisciplineStats();
   }
 
   // ── Actions ──

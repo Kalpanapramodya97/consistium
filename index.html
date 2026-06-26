@@ -1,15 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Consistium — An atomic habit tracker inspired by James Clear. Build consistency, one day at a time." />
+  <meta name="description"
+    content="Consistium — An atomic habit tracker inspired by James Clear. Build consistency, one day at a time." />
   <title>Consistium — Atomic Habit Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
   <!-- Ambient Background -->
   <div class="ambient-bg">
@@ -22,158 +27,235 @@
     <!-- Main Content (Left) -->
     <div class="app main-content" id="app">
 
-    <!-- Header -->
-    <header class="header" id="header">
-      <div class="header-left">
-        <h1 class="logo">
-          <span class="logo-icon">◆</span>
-          <span class="logo-text">Consistium</span>
-        </h1>
-        <p class="tagline">"You do not rise to the level of your goals. You fall to the level of your systems."</p>
-      </div>
-      <div class="header-right">
-        <div class="streak-badge" id="streakBadge">
-          <span class="streak-fire">🔥</span>
-          <span class="streak-count" id="streakCount">0</span>
-          <span class="streak-label">day streak</span>
+      <!-- Header -->
+      <header class="header" id="header">
+        <div class="header-left">
+          <h1 class="logo">
+            <span class="logo-icon">◆</span>
+            <span class="logo-text">Consistium</span>
+          </h1>
+          <p class="tagline">"You do not rise to the level of your goals. You fall to the level of your systems."</p>
         </div>
-        <button class="btn-icon" id="adminBtn" title="Admin Dashboard" aria-label="Admin Dashboard" style="display: none;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </button>
-        <button class="btn-icon" id="authBtn" title="Login / Register" aria-label="Login / Register">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        </button>
-        <button class="btn-icon" id="aiAdvisorToggle" title="AI Advisor" aria-label="Toggle AI Advisor">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10a7 7 0 0 1-14 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg>
-        </button>
-        <button class="btn-icon" id="themeToggleBtn" title="Toggle Theme" aria-label="Toggle Theme">
-          <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-          <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        </button>
-        <button class="btn-icon" id="settingsBtn" title="Settings" aria-label="Settings">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-        </button>
-      </div>
-    </header>
-
-    <!-- Date Navigation -->
-    <section class="date-nav" id="dateNav">
-      <button class="date-arrow" id="prevDay" aria-label="Previous day">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
-      <div class="date-display" id="dateDisplay">
-        <span class="date-weekday" id="dateWeekday">Tuesday</span>
-        <span class="date-full" id="dateFull">May 12, 2026</span>
-      </div>
-      <button class="date-arrow" id="nextDay" aria-label="Next day">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
-    </section>
-
-    <!-- Score Dashboard -->
-    <section class="dashboard" id="dashboard">
-      <div class="score-ring-container">
-        <svg class="score-ring" viewBox="0 0 120 120" id="scoreRing">
-          <circle class="score-ring-bg" cx="60" cy="60" r="52" />
-          <circle class="score-ring-fill" cx="60" cy="60" r="52" id="scoreRingFill" />
-        </svg>
-        <div class="score-text">
-          <span class="score-percent" id="scorePercent">0%</span>
-          <span class="score-sub">Today's score</span>
+        <div class="header-right">
+          <button class="btn-icon" id="adminBtn" title="Admin Dashboard" aria-label="Admin Dashboard"
+            style="display: none;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          </button>
+          <button class="btn-icon" id="authBtn" title="Login / Register" aria-label="Login / Register">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </button>
+          <button class="btn-icon" id="aiAdvisorToggle" title="AI Advisor" aria-label="Toggle AI Advisor">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+              <path d="M19 10a7 7 0 0 1-14 0" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+            </svg>
+          </button>
+          <button class="btn-icon" id="themeToggleBtn" title="Toggle Theme" aria-label="Toggle Theme">
+            <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+            <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          </button>
+          <button class="btn-icon" id="settingsBtn" title="Settings" aria-label="Settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+            </svg>
+          </button>
         </div>
-      </div>
-      <div class="stats-grid">
-        <div class="stat-card" id="statTracked">
-          <span class="stat-value" id="habitsTracked">0</span>
-          <span class="stat-label">Tracked</span>
-        </div>
-        <div class="stat-card" id="statCompleted">
-          <span class="stat-value" id="habitsCompleted">0</span>
-          <span class="stat-label">Completed</span>
-        </div>
-        <div class="stat-card" id="statPoints">
-          <span class="stat-value" id="pointsEarned" style="font-size:0.95rem;">0/0</span>
-          <span class="stat-label">Points</span>
-        </div>
-        <div class="stat-card" id="statStatus">
-          <span class="stat-value stat-status" id="statusText">Pending</span>
-          <span class="stat-label">Status</span>
-        </div>
-      </div>
-    </section>
+      </header>
 
-    <!-- Motivation Banner -->
-    <div class="motivation-banner" id="motivationBanner" style="display: none;">
-      <div class="confetti-container" id="confettiContainer"></div>
-      <span class="motivation-emoji">🏆</span>
-      <span class="motivation-text">Perfect day — every habit completed!</span>
-    </div>
-
-    <!-- Habit List -->
-    <section class="habits-section">
-      <div class="habits-header">
-        <h2 class="section-title">Today's habits</h2>
-        <button class="btn-add" id="addHabitBtn" title="Add new habit" aria-label="Add new habit">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          <span>Add Habit</span>
+      <!-- Date Navigation -->
+      <section class="date-nav" id="dateNav">
+        <button class="date-arrow" id="prevDay" aria-label="Previous day">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
         </button>
-      </div>
-
-      <!-- Good Habits -->
-      <div class="habit-type-header" id="goodHabitsHeader">
-        <span class="habit-type-icon">✅</span>
-        <span class="habit-type-label">Good Habits — Build these</span>
-        <span class="habit-type-count" id="goodHabitCount">0</span>
-      </div>
-      <div class="habit-list" id="goodHabitList"></div>
-
-      <!-- Bad Habits -->
-      <div class="habit-type-header bad" id="badHabitsHeader">
-        <span class="habit-type-icon">🚫</span>
-        <span class="habit-type-label">Bad Habits — Break these</span>
-        <span class="habit-type-count" id="badHabitCount">0</span>
-      </div>
-      <div class="habit-list" id="badHabitList"></div>
-
-      <!-- Special Tasks -->
-      <div class="habit-type-header special" id="specialTasksHeader" style="display: none;">
-        <span class="habit-type-icon">🌟</span>
-        <span class="habit-type-label">Special Tasks — One-time</span>
-        <span class="habit-type-count" id="specialTaskCount">0</span>
-      </div>
-      <div class="habit-list" id="specialTaskList"></div>
-
-      <p class="habit-hint" id="habitHint">Tap a pending habit to mark it done</p>
-    </section>
-
-    <!-- Weekly Heatmap -->
-    <section class="heatmap-section">
-      <h2 class="section-title">Weekly Overview</h2>
-      <div class="heatmap" id="weeklyHeatmap"></div>
-    </section>
-
-    <!-- Quotes Section -->
-    <section class="quotes-section">
-      <div class="quote-card-wrapper">
-        <button class="quote-arrow" id="prevQuote" aria-label="Previous quote">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        </button>
-        <div class="quote-card" id="quoteCard">
-          <svg class="quote-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z"/></svg>
-          <p class="quote-text" id="quoteText">Every action you take is a vote for the type of person you wish to become.</p>
-          <span class="quote-author" id="quoteAuthor">— James Clear, Atomic Habits</span>
+        <div class="date-display" id="dateDisplay">
+          <span class="date-weekday" id="dateWeekday">Tuesday</span>
+          <span class="date-full" id="dateFull">May 12, 2026</span>
         </div>
-        <button class="quote-arrow" id="nextQuote" aria-label="Next quote">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        <button class="date-arrow" id="nextDay" aria-label="Next day">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
         </button>
-      </div>
-    </section>
+      </section>
 
-    <!-- Footer -->
-    <footer class="footer">
-      <p>Built with <span class="footer-heart">♦</span> Consistium &mdash; 1% better every day</p>
-    </footer>
-  </div><!-- /.main-content -->
+      <!-- Score Dashboard -->
+      <section class="dashboard" id="dashboard">
+        <div class="score-ring-container">
+          <svg class="score-ring" viewBox="0 0 120 120" id="scoreRing">
+            <circle class="score-ring-bg" cx="60" cy="60" r="52" />
+            <circle class="score-ring-fill" cx="60" cy="60" r="52" id="scoreRingFill" />
+          </svg>
+          <div class="score-text">
+            <span class="score-percent" id="scorePercent">0%</span>
+            <span class="score-sub">Today's score</span>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card" id="statTracked">
+            <span class="stat-value" id="habitsTracked">0</span>
+            <span class="stat-label">Tracked</span>
+          </div>
+          <div class="stat-card" id="statCompleted">
+            <span class="stat-value" id="habitsCompleted">0</span>
+            <span class="stat-label">Completed</span>
+          </div>
+          <div class="stat-card" id="statPoints">
+            <span class="stat-value" id="pointsEarned" style="font-size:0.95rem;">0/0</span>
+            <span class="stat-label">Points</span>
+          </div>
+          <div class="stat-card" id="statStatus">
+            <span class="stat-value stat-status" id="statusText">Pending</span>
+            <span class="stat-label">Status</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Discipline Level Dashboard -->
+      <section class="discipline-section" id="disciplineSection" style="display: none;">
+        <div class="discipline-card">
+          <div class="discipline-header">
+            <h3>Discipline Level</h3>
+            <span class="level-badge" id="disciplineLevelName">Beginner</span>
+          </div>
+          <div class="discipline-stats-grid">
+            <div class="d-stat">
+              <span class="d-value" id="disciplineCurrentStreak">0</span>
+              <span class="d-label">Current Streak</span>
+            </div>
+            <div class="d-stat">
+              <span class="d-value" id="disciplineLongestStreak">0</span>
+              <span class="d-label">Longest Streak</span>
+            </div>
+            <div class="d-stat">
+              <span class="d-value" id="disciplineTotalDays">0</span>
+              <span class="d-label">Total Perfect Days</span>
+            </div>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-text" id="disciplineProgressText">3 more perfect days to next level</div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="disciplineProgressFill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Motivation Banner -->
+      <div class="motivation-banner" id="motivationBanner" style="display: none;">
+        <div class="confetti-container" id="confettiContainer"></div>
+        <span class="motivation-emoji">🏆</span>
+        <span class="motivation-text">Perfect day — every habit completed!</span>
+      </div>
+
+      <!-- Habit List -->
+      <section class="habits-section">
+        <div class="habits-header">
+          <h2 class="section-title">Today's habits</h2>
+          <button class="btn-add" id="addHabitBtn" title="Add new habit" aria-label="Add new habit">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span>Add Habit</span>
+          </button>
+        </div>
+
+        <!-- Good Habits -->
+        <div class="habit-type-header" id="goodHabitsHeader">
+          <span class="habit-type-icon">✅</span>
+          <span class="habit-type-label">Good Habits — Build these</span>
+          <span class="habit-type-count" id="goodHabitCount">0</span>
+        </div>
+        <div class="habit-list" id="goodHabitList"></div>
+
+        <!-- Bad Habits -->
+        <div class="habit-type-header bad" id="badHabitsHeader">
+          <span class="habit-type-icon">🚫</span>
+          <span class="habit-type-label">Bad Habits — Break these</span>
+          <span class="habit-type-count" id="badHabitCount">0</span>
+        </div>
+        <div class="habit-list" id="badHabitList"></div>
+
+        <!-- Special Tasks -->
+        <div class="habit-type-header special" id="specialTasksHeader" style="display: none;">
+          <span class="habit-type-icon">🌟</span>
+          <span class="habit-type-label">Special Tasks — One-time</span>
+          <span class="habit-type-count" id="specialTaskCount">0</span>
+        </div>
+        <div class="habit-list" id="specialTaskList"></div>
+
+        <p class="habit-hint" id="habitHint">Tap a pending habit to mark it done</p>
+      </section>
+
+      <!-- Weekly Heatmap -->
+      <section class="heatmap-section">
+        <h2 class="section-title">Weekly Overview</h2>
+        <div class="heatmap" id="weeklyHeatmap"></div>
+      </section>
+
+      <!-- Quotes Section -->
+      <section class="quotes-section">
+        <div class="quote-card-wrapper">
+          <button class="quote-arrow" id="prevQuote" aria-label="Previous quote">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <div class="quote-card" id="quoteCard">
+            <svg class="quote-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z" />
+            </svg>
+            <p class="quote-text" id="quoteText">Every action you take is a vote for the type of person you wish to
+              become.</p>
+            <span class="quote-author" id="quoteAuthor">— James Clear, Atomic Habits</span>
+          </div>
+          <button class="quote-arrow" id="nextQuote" aria-label="Next quote">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <p>Built with <span class="footer-heart">♦</span> Consistium &mdash; 1% better every day</p>
+      </footer>
+    </div><!-- /.main-content -->
 
     <!-- AI Habit Advisor Panel (Right Side) -->
     <aside class="ai-advisor-panel" id="aiAdvisorPanel">
@@ -192,7 +274,11 @@
           </div>
         </div>
         <button class="btn-icon ai-close-btn" id="aiCloseBtn" title="Close Panel" aria-label="Close AI Panel">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
       </div>
 
@@ -218,7 +304,11 @@
         <div class="ai-input-wrapper">
           <input type="text" class="ai-input" id="aiInput" placeholder="Ask for habit advice..." autocomplete="off" />
           <button class="ai-send-btn" id="aiSendBtn" title="Send" aria-label="Send message">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
           </button>
         </div>
       </div>
@@ -236,7 +326,11 @@
       <div class="modal-header">
         <h3 class="modal-title" id="modalTitle">Add New Habit</h3>
         <button class="btn-icon modal-close" id="modalCloseBtn" aria-label="Close modal">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
       </div>
       <form id="habitForm">
@@ -339,7 +433,8 @@
         </div>
         <div class="form-group">
           <label for="habitRepeatPattern">Repeat Pattern</label>
-          <select id="habitRepeatPattern" class="form-control" style="width: 100%; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font); font-size: 0.9rem; transition: var(--transition);">
+          <select id="habitRepeatPattern" class="form-control"
+            style="width: 100%; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font); font-size: 0.9rem; transition: var(--transition);">
             <option value="every_day">Every day</option>
             <option value="every_other_day">Every other day</option>
             <option value="specific_days">Specific days of the week</option>
@@ -362,11 +457,13 @@
         </div>
         <div class="form-group" id="habitIntervalGroup" style="display: none;">
           <label for="habitIntervalDays">Repeat Every (Days)</label>
-          <input type="number" id="habitIntervalDays" min="2" max="365" value="2" style="width: 100%; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font); font-size: 0.9rem;" />
+          <input type="number" id="habitIntervalDays" min="2" max="365" value="2"
+            style="width: 100%; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font); font-size: 0.9rem;" />
         </div>
         <div class="form-group">
           <label for="habitStartDate">Start Date</label>
-          <input type="date" id="habitStartDate" style="width: 100%; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font); font-size: 0.9rem;" />
+          <input type="date" id="habitStartDate"
+            style="width: 100%; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font); font-size: 0.9rem;" />
         </div>
         <input type="hidden" id="habitEditId" value="" />
         <div class="modal-actions">
@@ -383,7 +480,11 @@
       <div class="modal-header">
         <h3 class="modal-title">Settings</h3>
         <button class="btn-icon modal-close" id="settingsCloseBtn" aria-label="Close settings">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
       </div>
       <div class="settings-body">
@@ -410,7 +511,11 @@
       <div class="modal-header">
         <h3 class="modal-title" id="authModalTitle">Login</h3>
         <button class="btn-icon modal-close" id="authCloseBtn" aria-label="Close Auth">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
       </div>
       <form id="authForm">
@@ -449,7 +554,11 @@
       <div class="modal-header">
         <h3 class="modal-title">Admin Dashboard</h3>
         <button class="btn-icon modal-close" id="adminCloseBtn" aria-label="Close Admin">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
       </div>
       <div class="settings-body">
@@ -468,7 +577,7 @@
             <span class="stat-label">Total Completions</span>
           </div>
         </div>
-        
+
         <h4>User Management</h4>
         <div id="adminUserList" style="max-height: 300px; overflow-y: auto;">
           <!-- Users injected here -->
@@ -479,4 +588,5 @@
 
   <script src="app.js"></script>
 </body>
+
 </html>
