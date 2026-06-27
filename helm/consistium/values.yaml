@@ -235,3 +235,19 @@ lifecycle:
   preStop:
     exec:
       command: ["/bin/sh", "-c", "sleep 5 && nginx -s quit"]
+
+# ──────────────────────────────────────────────────────────────
+# MongoDB Configuration
+# ──────────────────────────────────────────────────────────────
+mongodb:
+  enabled: true
+  image:
+    repository: mongo
+    tag: "6"
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClassName: ""
+    accessModes:
+      - ReadWriteOnce
+    mountPath: /data/db

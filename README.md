@@ -86,6 +86,19 @@ Run with Docker Compose for a production-ready Nginx setup, Node.js Backend, Mon
 docker compose up -d
 ```
 
+#### Testing Persistence with Docker Compose
+To verify that your habit data is safely stored outside the container, you can simulate a crash or restart:
+```bash
+# 1. Create some habit data in the app
+# 2. Stop and remove the containers
+docker compose down
+# 3. Start the containers again
+docker compose up -d
+# 4. Verify your data is still present!
+```
+> [!WARNING]
+> Do NOT use `docker compose down -v` unless you intentionally want to delete all database volumes and destroy your data.
+
 #### 🔗 Accessing the Applications
 
 Once the containers are running, you can access the various services at the following URLs:
@@ -106,13 +119,35 @@ Run the pre-built image directly from the GitHub Container Registry. No cloning 
 docker run -d -p 3000:80 --name consistium ghcr.io/kalpanapramodya97/consistium/habit-tracker:latest
 ```
 
+#### Running the Database with Docker
+If you want to run the database independently using native Docker commands, ensure you create and mount a proper persistent volume so data survives container restarts:
+```bash
+# Create a Docker volume
+docker volume create consistium_data
+
+# Run MongoDB with the volume mounted to the data directory
+docker run -d --name mongodb -p 27017:27017 -v consistium_data:/data/db mongo:6
+```
+To test persistence, restart the container (`docker restart mongodb`) or remove it and run the command again. Your data will remain safely stored in the `consistium_data` volume.
+
 ### ☸️ Option 4: Kubernetes (Helm Chart)
-Deploy to any Kubernetes cluster with the included production-grade Helm chart. Includes HPA, PDBs, and NetworkPolicies.
+Deploy to any Kubernetes cluster with the included production-grade Helm chart. Includes HPA, PDBs, NetworkPolicies, and a StatefulSet for MongoDB with persistent storage.
 ```bash
 helm install consistium ./helm/consistium \
   -f helm/environments/prod.yaml \
   -n consistium-prod --create-namespace
 ```
+
+#### Testing K8s Persistence
+The database utilizes a Kubernetes `StatefulSet` and a `PersistentVolumeClaim` (PVC) to guarantee data safety. To verify persistence:
+```bash
+# 1. Create habit data in the UI
+# 2. Delete the MongoDB pod to simulate a node failure
+kubectl delete pod consistium-mongodb-0 -n consistium-prod
+# 3. Kubernetes will automatically recreate the pod and reattach the PVC
+# 4. Refresh the UI — your data is still intact!
+```
+
 > 📚 See the full [Kubernetes Deployment Guide](docs/devops/kubernetes.md) for more details.
 
 ---

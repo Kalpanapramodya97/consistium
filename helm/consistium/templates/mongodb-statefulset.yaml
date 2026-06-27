@@ -1,0 +1,53 @@
+{{- if .Values.mongodb.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "consistium.fullname" . }}-mongodb
+  labels:
+    {{- include "consistium.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mongodb
+spec:
+  serviceName: {{ include "consistium.fullname" . }}-mongodb
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "consistium.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mongodb
+  template:
+    metadata:
+      labels:
+        {{- include "consistium.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: "{{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: mongodb
+              containerPort: 27017
+              protocol: TCP
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: {{ .Values.mongodb.persistence.mountPath }}
+  {{- if .Values.mongodb.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: mongodb-data
+      spec:
+        accessModes:
+          {{- range .Values.mongodb.persistence.accessModes }}
+          - {{ . | quote }}
+          {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.mongodb.persistence.size | quote }}
+        {{- if .Values.mongodb.persistence.storageClassName }}
+        storageClassName: {{ .Values.mongodb.persistence.storageClassName | quote }}
+        {{- end }}
+  {{- else }}
+      volumes:
+        - name: mongodb-data
+          emptyDir: {}
+  {{- end }}
+{{- end }}
