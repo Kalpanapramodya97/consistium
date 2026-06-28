@@ -94,6 +94,29 @@ jobs:
         working-directory: ./terraform
         run: tflint -f compact
 
+  infracost-estimation:
+    name: Infracost FinOps Estimation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Run Infracost Breakdown
+        run: infracost breakdown --path ./terraform --format json --out-file infracost-results.json
+
+      - name: Upload Infracost results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: infracost-results
+          path: infracost-results.json
+          retention-days: 7
+
   secret-scan:
     name: Secret Scanning
     runs-on: ubuntu-latest
@@ -324,7 +347,7 @@ jobs:
   docker-push:
     name: Push Docker Image
     runs-on: ubuntu-latest
-    needs: [quality-checks, backend-tests, terraform-checks, secret-scan, codeql-sast, trivy-fs-scan, docker-build-and-scan, dast-scan]
+    needs: [quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, docker-build-and-scan, dast-scan]
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     permissions:
       contents: read
@@ -476,7 +499,7 @@ jobs:
   security-report:
     name: Generate Security Report
     runs-on: ubuntu-latest
-    needs: [quality-checks, backend-tests, terraform-checks, secret-scan, codeql-sast, trivy-fs-scan, docker-build-and-scan, dast-scan]
+    needs: [quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, docker-build-and-scan, dast-scan]
     if: always() # Generate report even if scans fail
     permissions:
       contents: read
@@ -512,6 +535,13 @@ jobs:
           path: scan-results/
         continue-on-error: true
 
+      - name: Download Infracost results
+        uses: actions/download-artifact@v4
+        with:
+          name: infracost-results
+          path: scan-results/
+        continue-on-error: true
+
       - name: Install jq
         run: |
           sudo apt-get update -qq
@@ -534,6 +564,7 @@ jobs:
             --codeql "${{ steps.detect-sarif.outputs.sarif_file }}" \
             --trivy-fs "scan-results/trivy-fs-results.json" \
             --trivy-image "scan-results/trivy-image-results.json" \
+            --infracost "scan-results/infracost-results.json" \
             --template "security/report-template.html" \
             --output "consistium-security-report.html"
 

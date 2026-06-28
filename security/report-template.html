@@ -644,6 +644,10 @@
                     <div class="stat-number">{{LOW_COUNT}}</div>
                     <div class="stat-label">Low</div>
                 </div>
+                <div class="summary-stat stat-total" style="border-color: rgba(48, 209, 88, 0.4);">
+                    <div class="stat-number" style="color: var(--severity-low);">${{TOTAL_MONTHLY_COST}}</div>
+                    <div class="stat-label">Monthly Cloud Cost</div>
+                </div>
             </div>
 
             <!-- Severity Breakdown Bar Chart -->
@@ -739,6 +743,21 @@
             </div>
             <div class="card">
                 {{TRIVY_IMAGE_CONTENT}}
+            </div>
+        </section>
+
+        <!-- ===== FINOPS ESTIMATION ===== -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-icon" style="background: rgba(48, 209, 88, 0.12);">💰</div>
+                <div>
+                    <h2 class="section-title">Cloud Cost Estimation</h2>
+                    <p class="section-tool">Infracost — AWS Infrastructure FinOps Analysis</p>
+                </div>
+                <span class="scan-status {{INFRACOST_STATUS_CLASS}}">{{INFRACOST_STATUS_ICON}} {{INFRACOST_STATUS}}</span>
+            </div>
+            <div class="card">
+                {{INFRACOST_CONTENT}}
             </div>
         </section>
 

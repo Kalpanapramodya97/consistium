@@ -32,6 +32,7 @@ TRUFFLEHOG_FILE=""
 CODEQL_FILE=""
 TRIVY_FS_FILE=""
 TRIVY_IMAGE_FILE=""
+INFRACOST_FILE=""
 DRY_RUN=false
 
 # ── Parse arguments ─────────────────────────────────────────────────────────
@@ -41,6 +42,7 @@ while [[ $# -gt 0 ]]; do
         --codeql)       CODEQL_FILE="$2"; shift 2 ;;
         --trivy-fs)     TRIVY_FS_FILE="$2"; shift 2 ;;
         --trivy-image)  TRIVY_IMAGE_FILE="$2"; shift 2 ;;
+        --infracost)    INFRACOST_FILE="$2"; shift 2 ;;
         --template)     TEMPLATE="$2"; shift 2 ;;
         --output)       OUTPUT="$2"; shift 2 ;;
         --dry-run)      DRY_RUN=true; shift ;;
@@ -400,6 +402,80 @@ else
     TRIVY_IMAGE_STATUS_ICON="—"
 fi
 
+# ── Process Infracost results ────────────────────────────────────────────────
+INFRACOST_CONTENT=""
+INFRACOST_STATUS=""
+INFRACOST_STATUS_CLASS=""
+INFRACOST_STATUS_ICON=""
+TOTAL_MONTHLY_COST="0.00"
+
+if [[ "$DRY_RUN" == true ]]; then
+    TOTAL_MONTHLY_COST="124.50"
+    INFRACOST_STATUS="Estimated"
+    INFRACOST_STATUS_CLASS="scan-passed"
+    INFRACOST_STATUS_ICON="✓"
+    INFRACOST_CONTENT=$(cat <<EOF
+<table class="findings-table">
+    <thead>
+        <tr>
+            <th>Resource Type</th>
+            <th>Monthly Cost</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td>aws_eks_cluster</td><td class="mono">\$73.00</td></tr>
+        <tr><td>aws_db_instance</td><td class="mono">\$51.50</td></tr>
+    </tbody>
+</table>
+EOF
+)
+elif [[ -n "$INFRACOST_FILE" && -f "$INFRACOST_FILE" ]]; then
+    TOTAL_MONTHLY_COST=$(jq -r '.totalMonthlyCost // "0.00"' "$INFRACOST_FILE" 2>/dev/null || echo "0.00")
+    # Format to 2 decimal places
+    TOTAL_MONTHLY_COST=$(printf "%.2f" "$TOTAL_MONTHLY_COST" 2>/dev/null || echo "0.00")
+    
+    INFRACOST_STATUS="Estimated"
+    INFRACOST_STATUS_CLASS="scan-passed"
+    INFRACOST_STATUS_ICON="✓"
+
+    INFRACOST_ROWS=""
+    # Extract top level project breakdown
+    while IFS= read -r resource; do
+        rtype=$(echo "$resource" | jq -r '.resourceType // "Unknown"')
+        rcost=$(echo "$resource" | jq -r '.monthlyCost // "0"')
+        rcost=$(printf "%.2f" "$rcost" 2>/dev/null || echo "0.00")
+        
+        INFRACOST_ROWS+="<tr>"
+        INFRACOST_ROWS+="<td>$(html_escape "$rtype")</td>"
+        INFRACOST_ROWS+="<td class=\"mono\">\$${rcost}</td>"
+        INFRACOST_ROWS+="</tr>"
+    done < <(jq -c '.projects[0].breakdown.resources[]?' "$INFRACOST_FILE" 2>/dev/null)
+
+    if [[ -z "$INFRACOST_ROWS" ]]; then
+        INFRACOST_CONTENT=$(no_findings_html "Infracost FinOps scanner")
+    else
+        INFRACOST_CONTENT=$(cat <<EOF
+<table class="findings-table">
+    <thead>
+        <tr>
+            <th>Resource Type</th>
+            <th>Monthly Cost</th>
+        </tr>
+    </thead>
+    <tbody>
+        ${INFRACOST_ROWS}
+    </tbody>
+</table>
+EOF
+)
+    fi
+else
+    INFRACOST_CONTENT=$(scan_skipped_html "Infracost scan")
+    INFRACOST_STATUS="Skipped"
+    INFRACOST_STATUS_CLASS="scan-skipped"
+    INFRACOST_STATUS_ICON="—"
+fi
+
 # ── Calculate totals ─────────────────────────────────────────────────────────
 TOTAL_FINDINGS=$((CRITICAL_COUNT + HIGH_COUNT + MEDIUM_COUNT + LOW_COUNT))
 
@@ -494,6 +570,7 @@ echo "$SECRET_SCAN_CONTENT" > "${TMPDIR_REPORT}/secret.html"
 echo "$SAST_SCAN_CONTENT" > "${TMPDIR_REPORT}/sast.html"
 echo "$TRIVY_FS_CONTENT" > "${TMPDIR_REPORT}/trivy_fs.html"
 echo "$TRIVY_IMAGE_CONTENT" > "${TMPDIR_REPORT}/trivy_image.html"
+echo "$INFRACOST_CONTENT" > "${TMPDIR_REPORT}/infracost.html"
 
 # Use Node.js for reliable multi-line substitution
 node -e "
@@ -537,7 +614,11 @@ const simple = {
     '{{TRIVY_FS_STATUS_ICON}}': '${TRIVY_FS_STATUS_ICON}',
     '{{TRIVY_IMAGE_STATUS}}': '${TRIVY_IMAGE_STATUS}',
     '{{TRIVY_IMAGE_STATUS_CLASS}}': '${TRIVY_IMAGE_STATUS_CLASS}',
-    '{{TRIVY_IMAGE_STATUS_ICON}}': '${TRIVY_IMAGE_STATUS_ICON}'
+    '{{TRIVY_IMAGE_STATUS_ICON}}': '${TRIVY_IMAGE_STATUS_ICON}',
+    '{{INFRACOST_STATUS}}': '${INFRACOST_STATUS}',
+    '{{INFRACOST_STATUS_CLASS}}': '${INFRACOST_STATUS_CLASS}',
+    '{{INFRACOST_STATUS_ICON}}': '${INFRACOST_STATUS_ICON}',
+    '{{TOTAL_MONTHLY_COST}}': '${TOTAL_MONTHLY_COST}'
 };
 
 for (const [key, value] of Object.entries(simple)) {
@@ -548,7 +629,8 @@ const content_files = {
     '{{SECRET_SCAN_CONTENT}}': '${TMPDIR_REPORT}/secret.html',
     '{{SAST_SCAN_CONTENT}}': '${TMPDIR_REPORT}/sast.html',
     '{{TRIVY_FS_CONTENT}}': '${TMPDIR_REPORT}/trivy_fs.html',
-    '{{TRIVY_IMAGE_CONTENT}}': '${TMPDIR_REPORT}/trivy_image.html'
+    '{{TRIVY_IMAGE_CONTENT}}': '${TMPDIR_REPORT}/trivy_image.html',
+    '{{INFRACOST_CONTENT}}': '${TMPDIR_REPORT}/infracost.html'
 };
 
 for (const [key, filepath] of Object.entries(content_files)) {
