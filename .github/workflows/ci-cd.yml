@@ -497,7 +497,7 @@ jobs:
           attachments: RELEASE_DOCUMENT.html
 
   security-report:
-    name: Generate Security Report
+    name: Generate DevSecOps & FinOps Report
     runs-on: ubuntu-latest
     needs: [quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, docker-build-and-scan, dast-scan]
     if: always() # Generate report even if scans fail
@@ -583,11 +583,11 @@ jobs:
           secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "🛡️ Consistium Security Report — ${{ github.ref_name }} — Run #${{ github.run_number }}"
+          subject: "🛡️ Consistium DevSecOps & FinOps Report — ${{ github.ref_name }} — Run #${{ github.run_number }}"
           to: kalpanapramodya97@gmail.com
           from: Consistium DevSecOps <kalpanapramodya97@gmail.com>
           body: |
-            Consistium DevSecOps Pipeline — Security Scan Report
+            Consistium DevSecOps Pipeline — DevSecOps & FinOps Report
 
             ────────────────────────────────────────────
             📋 Pipeline Run Details

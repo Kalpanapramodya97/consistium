@@ -510,7 +510,7 @@ MEDIUM_BAR_LABEL=$([[ $MEDIUM_PCT -ge 15 ]] && echo "$MEDIUM_COUNT" || echo "")
 LOW_BAR_LABEL=$([[ $LOW_PCT -ge 15 ]] && echo "$LOW_COUNT" || echo "")
 
 # ── Generate report ──────────────────────────────────────────────────────────
-echo "🔒 Consistium Security Report Generator"
+echo "🔒 Consistium DevSecOps & FinOps Report Generator"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Date:     ${REPORT_DATE}"
 echo "  Commit:   ${COMMIT_SHA_SHORT}"
