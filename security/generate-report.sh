@@ -410,7 +410,7 @@ INFRACOST_STATUS_ICON=""
 TOTAL_MONTHLY_COST="0.00"
 
 if [[ "$DRY_RUN" == true ]]; then
-    TOTAL_MONTHLY_COST="124.50"
+    TOTAL_MONTHLY_COST="1550"
     INFRACOST_STATUS="Estimated"
     INFRACOST_STATUS_CLASS="scan-passed"
     INFRACOST_STATUS_ICON="✓"
@@ -423,16 +423,16 @@ if [[ "$DRY_RUN" == true ]]; then
         </tr>
     </thead>
     <tbody>
-        <tr><td>aws_eks_cluster</td><td class="mono">\$73.00</td></tr>
-        <tr><td>aws_db_instance</td><td class="mono">\$51.50</td></tr>
+        <tr><td>aws_eks_cluster</td><td class="mono">\$73</td></tr>
+        <tr><td>aws_db_instance</td><td class="mono">\$52</td></tr>
     </tbody>
 </table>
 EOF
 )
 elif [[ -n "$INFRACOST_FILE" && -f "$INFRACOST_FILE" ]]; then
-    TOTAL_MONTHLY_COST=$(jq -r '.totalMonthlyCost // "0.00"' "$INFRACOST_FILE" 2>/dev/null || echo "0.00")
-    # Format to 2 decimal places
-    TOTAL_MONTHLY_COST=$(printf "%.2f" "$TOTAL_MONTHLY_COST" 2>/dev/null || echo "0.00")
+    TOTAL_MONTHLY_COST=$(jq -r '.totalMonthlyCost // "0"' "$INFRACOST_FILE" 2>/dev/null || echo "0")
+    # Format to nearest dollar
+    TOTAL_MONTHLY_COST=$(printf "%.0f" "$TOTAL_MONTHLY_COST" 2>/dev/null || echo "0")
     
     INFRACOST_STATUS="Estimated"
     INFRACOST_STATUS_CLASS="scan-passed"
@@ -443,7 +443,7 @@ elif [[ -n "$INFRACOST_FILE" && -f "$INFRACOST_FILE" ]]; then
     while IFS= read -r resource; do
         rtype=$(echo "$resource" | jq -r '.resourceType // "Unknown"')
         rcost=$(echo "$resource" | jq -r '.monthlyCost // "0"')
-        rcost=$(printf "%.2f" "$rcost" 2>/dev/null || echo "0.00")
+        rcost=$(printf "%.0f" "$rcost" 2>/dev/null || echo "0")
         
         INFRACOST_ROWS+="<tr>"
         INFRACOST_ROWS+="<td>$(html_escape "$rtype")</td>"
