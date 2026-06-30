@@ -62,7 +62,7 @@
 
 ### 🎨 Design & Experience
 - **🌗 Light & Dark Theme** — One-click dark mode toggle that automatically respects your OS colour-scheme preference.
-- **150+ Curated Quotes** — Motivational quotes from *Atomic Habits*, *Deep Work*, *Mindset*, and *Wild Courage*. Browse them or let them auto-rotate every 5 minutes.
+- **20+ Curated Quotes** — Motivational quotes from *Atomic Habits*, *Deep Work*, *Mindset*, and *Wild Courage*. Browse them or let them auto-rotate every 5 minutes.
 - **Keyboard Navigation** — Seamlessly navigate between days using the `←` and `→` arrow keys.
 - **Import / Export** — Full JSON backup and restore capabilities.
 
@@ -110,6 +110,7 @@ Once the containers are running, you can access the various services at the foll
 | **Backend API** | [http://localhost:5000/api/health](http://localhost:5000/api/health) | N/A | Node.js Express API Healthcheck (also proxied via frontend). |
 | **Grafana** | [http://localhost:3001](http://localhost:3001) | User: `admin`, Pass: `admin` | Observability UI for metrics (Prometheus) and logs (Loki). |
 | **Prometheus** | [http://localhost:9090](http://localhost:9090) | N/A | Time-series database scraping Nginx metrics. |
+| **Alertmanager** | [http://localhost:9093](http://localhost:9093) | N/A | Alert routing and notifications. |
 | **Loki** | `http://localhost:3100` | N/A | Log aggregation API (No Web UI - view logs inside Grafana). |
 | **MongoDB** | `mongodb://localhost:27017` | N/A | Database connection string (No Web UI - connect via MongoDB Compass). |
 
@@ -162,15 +163,15 @@ Consistium goes beyond just being a frontend app—it serves as a **reference ar
 | **Containerization** | Docker, multi-stage Alpine Nginx builds |
 | **Orchestration** | Kubernetes, Helm v3 |
 | **Infrastructure** | Terraform (VPC, EKS, DocumentDB), modular IaC, multi-env |
-| **Observability** | Prometheus, Grafana, Loki (LogQL) |
+| **Observability** | Prometheus, Grafana, Loki (LogQL), Alertmanager |
 | **FinOps** | Infracost (Cloud Cost Estimation) |
-| **Security (CI/CD)** | GitHub Actions, TruffleHog (Secrets), CodeQL (SAST), Trivy (CVEs), OWASP ZAP (DAST) |
+| **Security (CI/CD)** | GitHub Actions, TruffleHog (Secrets), CodeQL (SAST), Trivy (CVEs), OWASP ZAP (DAST), Ansible |
 
 <p align="center">
   <img src="https://img.shields.io/badge/Security-A+ Grade-success?style=for-the-badge&logo=security" alt="Security Grade" />
 </p>
 
-The project features a **unified CI/CD and DevSecOps pipeline** that runs **SAST**, **DAST** (OWASP ZAP), **Secret Scanning**, and **Container Vulnerability Scanning**, along with **FinOps Cloud Cost Estimation** via Infracost. It aggregates all security findings and AWS cost estimates into a beautiful branded HTML report and delivers it via email after every commit. Only if all security and quality checks pass will the application be released and pushed to the container registry.
+The project features a **unified CI/CD and DevSecOps pipeline** that runs **SAST**, **DAST** (OWASP ZAP), **Secret Scanning**, and **Container Vulnerability Scanning**, along with **FinOps Cloud Cost Estimation** via Infracost. It aggregates all security findings and AWS cost estimates into a beautiful branded HTML report and delivers it via email after every commit. Only if all security and quality checks pass will the application be released and pushed to the container registry. The project also uses **Ansible** for local security report generation.
 
 ---
 
