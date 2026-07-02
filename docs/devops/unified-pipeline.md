@@ -1,914 +1,158 @@
 # Unified CI/CD & DevSecOps Pipeline
 
-# CI/CD Pipeline
-
-Consistium's CI/CD pipeline enforces a disciplined path from code change to production-ready release. Every commit flows through a series of **automated quality gates**, followed by **parallel build stages**, and finally a **semantic release** — ensuring that only validated, versioned artifacts ever reach end users.
-
-The pipeline is defined in [`.github/workflows/ci.yml`](file:///f:/habit-tracker/.github/workflows/ci.yml) and orchestrated entirely by GitHub Actions.
+Consistium uses a single, unified pipeline defined in [`.github/workflows/ci-cd.yml`](file:///f:/habit-tracker/.github/workflows/ci-cd.yml) that automatically builds, tests, secures, and releases the application on every push and pull request. This pipeline orchestrates **10 discrete jobs across 3 phases**, implementing a robust "Shift-Left" security posture.
 
 ---
 
 ## Pipeline Architecture
 
-The pipeline is composed of four jobs arranged in a diamond-shaped dependency graph. Quality checks must pass before any build work begins, and both build jobs must succeed before a release is cut.
+The pipeline uses a "fan-out, fan-in" dependency graph. Eight highly parallelized quality and security checks must all pass before the Docker image is built. Finally, versioning and reporting are generated.
 
 ```mermaid
 flowchart TD
     trigger(["Push / PR to main or master"])
 
-    subgraph quality ["Stage 1 — Quality Gates"]
+    subgraph phase1 ["Phase 1 — Quality & Security"]
         qc["quality-checks"]
-        qc_lint["HTMLHint Linting"]
-        qc_docker["Hadolint Dockerfile Linting"]
-        qc --> qc_lint
-        qc --> qc_docker
+        bt["backend-tests"]
+        tc["terraform-checks"]
+        ie["infracost-estimation"]
+        ss["secret-scan"]
+        sast["codeql-sast"]
+        fs["trivy-fs-scan"]
+        dast["dast-scan"]
     end
 
-    subgraph build ["Stage 2 — Build"]
-        docker["docker-build"]
-        docker_login["Login to GHCR"]
-        docker_meta["Extract Metadata & Tags"]
-        docker_push["Build & Push Image"]
-        docker --> docker_login --> docker_meta --> docker_push
-
-        artifact["build-artifact"]
-        artifact_upload["Upload index.html, style.css, app.js"]
-        artifact --> artifact_upload
+    subgraph phase2 ["Phase 2 — Build & Scan"]
+        docker["docker-build-scan-push"]
     end
 
-    subgraph release ["Stage 3 — Release"]
+    subgraph phase3 ["Phase 3 — Release & Report"]
         semver["semantic-versioning"]
-        semver_bump["Bump Version Tag"]
-        semver_release["Create GitHub Release"]
-        semver --> semver_bump --> semver_release
+        report["security-report"]
     end
 
-    trigger --> qc
-    qc -- "passes" --> docker
-    qc -- "passes" --> artifact
-    docker -- "succeeds" --> semver
-    artifact -- "succeeds" --> semver
+    trigger --> phase1
+    qc & bt & tc & ie & ss & sast & fs & dast --> docker
+    docker --> semver
+    docker --> report
+    
+    style trigger fill:#8e44ad,stroke:#732d91,color:#fff
+    style phase1 fill:#2980b9,stroke:#1f618d,color:#fff
+    style phase2 fill:#27ae60,stroke:#1e8449,color:#fff
+    style phase3 fill:#e67e22,stroke:#d35400,color:#fff
 ```
 
 ---
 
-## Pipeline Triggers
+## Pipeline Triggers and Concurrency
 
 The pipeline activates on two event types:
 
 | Event | Branches | Purpose |
-|---|---|---|
-| `push` | `main`, `master` | Validate merged code and cut a release |
-| `pull_request` | `main`, `master` | Gate incoming changes before merge |
+|-------|----------|---------|
+| `push` | `main`, `master` | Mainline integration and deployment builds. |
+| `pull_request` | `main`, `master` | Verifies proposed changes before merging. |
 
-This dual-trigger strategy ensures that:
-
-- **Pull requests** receive full quality and build validation _before_ a maintainer approves the merge, catching issues early.
-- **Pushes to the default branch** re-run the full pipeline and, upon success, trigger the semantic versioning and release job — guaranteeing that every merge results in a versioned, tagged release.
-
----
-
-## Job 1 — `quality-checks`
-
-**Purpose:** Act as the first line of defense by statically analyzing source code and infrastructure definitions before any compute-intensive build work begins.
-
-**Runs on:** `ubuntu-latest`
-
-### Steps
-
-| # | Step | Tool / Action | Details |
-|---|---|---|---|
-| 1 | Checkout repository | `actions/checkout@v4` | Fetches the full working tree for analysis |
-| 2 | Setup Node.js | `actions/setup-node@v4` | Installs Node.js 20.x for npx-based tooling |
-| 3 | HTMLHint linting | `npx htmlhint "**/*.html" \|\| true` | Lints all HTML files against best-practice rules |
-| 4 | Hadolint Dockerfile linting | `hadolint/hadolint-action@v3.1.0` | Validates Dockerfile instructions against best practices |
-
-### Design Rationale
-
-- **HTMLHint** is run via `npx` to avoid committing a global dependency. The `|| true` suffix makes the step non-blocking — lint warnings are surfaced in the log but do not fail the pipeline, allowing teams to adopt linting incrementally.
-- **Hadolint** is the industry-standard Dockerfile linter, backed by ShellCheck for `RUN` instruction analysis. Running it as a dedicated GitHub Action ensures it uses the latest rule set and integrates cleanly with PR annotations.
-- By isolating quality checks in their own job, build resources are never consumed for code that fails basic validation.
-
----
-
-## Job 2 — `docker-build`
-
-**Purpose:** Build the application's Docker image and publish it to the GitHub Container Registry (GHCR).
-
-**Depends on:** `quality-checks`
-
-**Permissions:** `contents: read`, `packages: write`
-
-### Steps
-
-| # | Step | Tool / Action | Details |
-|---|---|---|---|
-| 1 | Checkout repository | `actions/checkout@v4` | Fetches source and Dockerfile |
-| 2 | Setup Docker Buildx | `docker/setup-buildx-action@v3` | Enables BuildKit features (layer caching, multi-platform builds) |
-| 3 | Login to GHCR | `docker/login-action@v3` | Authenticates to `ghcr.io` using the built-in `GITHUB_TOKEN` |
-| 4 | Extract lowercase repo name | Shell step | Normalises the repository name to lowercase for OCI compliance |
-| 5 | Extract Docker metadata | `docker/metadata-action@v5` | Generates image tags: `latest` (default branch only) + short SHA |
-| 6 | Build and push | `docker/build-push-action@v5` | Builds the image with GitHub Actions cache and pushes to GHCR |
-
-### Design Rationale
-
-- **Docker Buildx** replaces the legacy builder and unlocks BuildKit's advanced layer caching, which dramatically reduces rebuild times.
-- **`docker/metadata-action`** centralises tagging logic — no hand-rolled shell scripts to maintain. It automatically derives the correct tags from the Git context.
-- The lowercase extraction step is necessary because Docker image names are case-sensitive and must be lowercase, while GitHub repository names may contain uppercase characters.
-
----
-
-## Job 3 — `build-artifact`
-
-**Purpose:** Package the application's static assets as a downloadable GitHub Actions artifact for non-containerised deployment or manual inspection.
-
-**Depends on:** `quality-checks`
-
-### Artifact Contents
-
-| File | Role |
-|---|---|
-| `index.html` | Application entry point |
-| `style.css` | Stylesheet |
-| `app.js` | Client-side application logic |
-
-### Configuration
-
-- **Retention period:** 7 days — long enough for debugging and downstream consumption, short enough to avoid storage bloat.
-- This job runs in parallel with `docker-build`, maximising pipeline throughput by using the diamond dependency pattern.
-
-### Design Rationale
-
-Providing a standalone artifact alongside the Docker image serves two purposes:
-
-1. **Deployment flexibility** — teams that deploy to static hosting (e.g., GitHub Pages, Netlify, S3) can consume the artifact directly without Docker.
-2. **Auditability** — reviewers can download and inspect the exact files that were built from a given commit.
-
----
-
-## Job 4 — `semantic-versioning`
-
-**Purpose:** Automatically tag the repository with a semantic version and create a GitHub Release with auto-generated release notes.
-
-**Depends on:** `docker-build` + `build-artifact`
-
-**Condition:** Runs only on pushes to `main` or `master` (not on pull requests).
-
-**Permissions:** `contents: write`
-
-### Steps
-
-| # | Step | Tool / Action | Details |
-|---|---|---|---|
-| 1 | Checkout repository | `actions/checkout@v4` | Fetches Git history for tag analysis |
-| 2 | Bump version | `mathieudutour/github-tag-action@v6.2` | Calculates the next version and creates a Git tag (default: patch bump) |
-| 3 | Create GitHub Release | `softprops/action-gh-release@v2` | Publishes a release with auto-generated notes from merged PRs and commits |
-
-### Design Rationale
-
-- **Automatic patch bumping** means every successful merge to the default branch produces a new version (`v1.0.0` → `v1.0.1`) with zero manual effort.
-- The `github-tag-action` supports [Conventional Commits](https://www.conventionalcommits.org/) — if a commit message contains `feat:`, it bumps the minor version; `BREAKING CHANGE:` bumps the major version.
-- By gating the release on _both_ build jobs, we guarantee that the version tag corresponds to a commit where the Docker image was successfully published _and_ the static artifact was successfully built.
-
----
-
-## Container Registry Strategy
-
-Consistium images are published to the **GitHub Container Registry (GHCR)** at `ghcr.io`.
-
-### Why GHCR?
-
-| Consideration | GHCR Advantage |
-|---|---|
-| **Authentication** | Uses the built-in `GITHUB_TOKEN` — no external secrets to manage |
-| **Proximity** | Co-located with the source repository for minimal latency |
-| **Visibility** | Images are linked to the repository and visible in the Packages tab |
-| **Cost** | Free for public repositories; generous allowance for private ones |
-| **OCI Compliance** | Fully OCI-compliant registry, compatible with any container runtime |
-
-### Tagging Strategy
-
-Every image push produces **two tags**:
-
-| Tag | Example | Purpose |
-|---|---|---|
-| `latest` | `ghcr.io/owner/repo:latest` | Always points to the most recent default-branch build. Useful for development and `docker-compose` workflows. |
-| Short SHA | `ghcr.io/owner/repo:a1b2c3d` | Immutable, commit-pinned tag. Used for production deployments and rollback scenarios. |
-
-This dual-tag approach balances convenience (`latest` for local development) with reproducibility (SHA tags for production).
-
----
-
-## Caching Strategy
-
-Docker layer caching is implemented using the **GitHub Actions cache backend** (`type=gha`), configured in the `docker/build-push-action` step.
+### Concurrency Control
 
 ```yaml
-cache-from: type=gha
-cache-to: type=gha,mode=max
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 ```
-
-### How It Works
-
-1. After each build, all Docker layers are exported to the GitHub Actions cache.
-2. On subsequent builds, BuildKit pulls cached layers and only rebuilds layers whose inputs have changed.
-3. The `mode=max` setting caches _all_ layers — including intermediate layers — not just the final image layers. This maximises cache hit rates for multi-stage builds.
-
-### Benefits
-
-| Metric | Without Cache | With GHA Cache |
-|---|---|---|
-| Typical build time | 60–120s | 10–30s |
-| Network transfer | Full base image pull | Cached layers only |
-| Storage | N/A | Managed by GitHub (10 GB limit) |
-
-The GHA cache backend was chosen over registry-based caching (`type=registry`) because it avoids polluting the container registry with cache manifests and requires no additional authentication configuration.
+To optimize GitHub Actions minute usage, if a developer pushes a new commit while a previous run for the same branch is still executing, the older run is **automatically canceled**.
 
 ---
 
-## Release Strategy
+## Phase 1: Quality & Security Checks
 
-Consistium follows an **automated semantic versioning** strategy powered by Git tags and GitHub Releases.
+These jobs run completely in parallel, completing in minutes to provide immediate developer feedback.
 
-### Version Lifecycle
+### 1. Code Quality (`quality-checks`)
+- **HTML Linting**: Uses `htmlhint` to check syntax. Uses `|| true` so minor styling issues do not fail the build.
+- **Dockerfile Linting**: Uses `hadolint/hadolint-action` to enforce Docker best practices.
 
-```mermaid
-flowchart LR
-    A["Merge PR to main"] --> B["Pipeline runs"]
-    B --> C{"All jobs pass?"}
-    C -- "Yes" --> D["Bump version tag"]
-    D --> E["Create GitHub Release"]
-    E --> F["Auto-generated release notes"]
-    C -- "No" --> G["Pipeline fails — no release"]
-```
+### 2. Backend Tests (`backend-tests`)
+- Configures Node.js v20.
+- Installs dependencies using `npm ci`.
+- Runs Jest test suites with `npm test`.
 
-### Versioning Rules
+### 3. Terraform Validation (`terraform-checks`)
+- Runs `terraform fmt -check` to enforce HCL styling.
+- Runs `terraform validate` to verify module syntax.
+- Runs **TFLint** against the `terraform/` directory.
 
-| Commit Pattern | Version Bump | Example |
-|---|---|---|
-| Default (any commit) | **Patch** | `v1.2.3` → `v1.2.4` |
-| `feat:` prefix | **Minor** | `v1.2.3` → `v1.3.0` |
-| `BREAKING CHANGE:` in body | **Major** | `v1.2.3` → `v2.0.0` |
+### 4. FinOps Estimation (`infracost-estimation`)
+- Runs Infracost against the Terraform directory.
+- Estimates the monthly cost impact of infrastructure changes.
+- Exports a JSON breakdown for the final security report.
 
-### Release Notes
+### 5. Secret Scanning (`secret-scan`)
+- Runs **TruffleHog** via Docker against the entire commit history (`fetch-depth: 0`).
+- Looks for leaked credentials, API keys, and JWT secrets.
+- Uses `continue-on-error: true` but outputs JSON for the final report.
 
-GitHub Releases are created with **auto-generated release notes**, which aggregate:
+### 6. SAST (`codeql-sast`)
+- Initializes GitHub CodeQL for JavaScript.
+- Performs static analysis of the source code for vulnerabilities (e.g., injections, XSS).
+- Uploads SARIF results to GitHub's Security tab and saves for the final report.
 
-- PR titles merged since the last release
-- Commit messages for direct pushes
-- Contributor acknowledgements
+### 7. Dependency Scanning (`trivy-fs-scan`)
+- Uses Aqua Trivy to scan the local filesystem (`package.json`, `package-lock.json`).
+- Targets CRITICAL and HIGH vulnerabilities only.
+- Generates JSON for the final report.
 
-This removes the burden of manually writing changelogs while keeping stakeholders informed of what shipped in each version.
-
----
-
-## Pipeline Configuration Reference
-
-A consolidated reference of all GitHub Actions used in the pipeline:
-
-| Action | Version | Job | Purpose |
-|---|---|---|---|
-| `actions/checkout` | `v4` | All jobs | Clone the repository |
-| `actions/setup-node` | `v4` | `quality-checks` | Install Node.js 20.x for linting tools |
-| `hadolint/hadolint-action` | `v3.1.0` | `quality-checks` | Lint Dockerfiles against best practices |
-| `docker/setup-buildx-action` | `v3` | `docker-build` | Enable Docker BuildKit builder |
-| `docker/login-action` | `v3` | `docker-build` | Authenticate to GHCR |
-| `docker/metadata-action` | `v5` | `docker-build` | Generate image tags and labels |
-| `docker/build-push-action` | `v5` | `docker-build` | Build and push Docker images |
-| `actions/upload-artifact` | _(built-in)_ | `build-artifact` | Upload static files as pipeline artifact |
-| `mathieudutour/github-tag-action` | `v6.2` | `semantic-versioning` | Calculate and apply semantic version tags |
-| `softprops/action-gh-release` | `v2` | `semantic-versioning` | Create GitHub Releases with release notes |
-
-> [!TIP]
-> Pin actions to full SHA hashes in production pipelines (e.g., `actions/checkout@b4ffde6...`) to protect against supply-chain attacks via tag mutation. Version tags are shown here for readability.
-
+### 8. DAST (`dast-scan`)
+- Starts the application stack using `docker compose up -d`.
+- Waits for the application to report healthy status.
+- Runs OWASP ZAP baseline scan against the running container network.
+- Identifies runtime vulnerabilities like missing headers and misconfigurations.
 
 ---
 
-## DevSecOps Pipeline Elements
+## Phase 2: Build & Push
 
-Consistium integrates security scanning directly into its CI/CD pipeline, following a **shift-left security** philosophy. Rather than treating security as a late-stage gate, every push, pull request, and weekly schedule triggers automated analysis that catches vulnerabilities at the earliest possible moment — when they are cheapest and simplest to fix.
+This phase executes only if **all** Phase 1 jobs succeed.
 
-The pipeline is defined in [`.github/workflows/devsecops.yml`](../../.github/workflows/devsecops.yml).
-
-> [!IMPORTANT]
-> The pipeline runs on **every push to `main`/`master`**, **every pull request targeting those branches**, and on a **weekly cron schedule** (Sundays at midnight UTC). Security is not optional — it is enforced automatically.
-
----
-
-## Pipeline Overview
-
-The DevSecOps pipeline consists of three independent, parallel jobs that each target a different layer of the application security stack:
-
-```mermaid
-flowchart TD
-    A["Trigger: Push / PR / Weekly Cron"] --> B{"DevSecOps Pipeline"}
-
-    B --> C["🔑 Job 1: secret-scan\n(TruffleHog)"]
-    B --> D["🔍 Job 2: codeql-sast\n(GitHub CodeQL)"]
-    B --> E["🛡️ Job 3: trivy-scan\n(Aqua Trivy)"]
-
-    C --> C1["Scan full git history\nfor leaked secrets"]
-    C1 --> C2{"Verified secrets found?"}
-    C2 -- Yes --> C3["❌ Fail pipeline"]
-    C2 -- No --> C4["✅ Pass"]
-
-    D --> D1["Analyze JavaScript source\nfor vulnerabilities"]
-    D1 --> D2{"Security issues found?"}
-    D2 -- Yes --> D3["⚠️ Report to\nSecurity tab"]
-    D2 -- No --> D4["✅ Pass"]
-
-    E --> E1["Phase 1: Filesystem scan\n(dependencies)"]
-    E1 --> E2{"CRITICAL/HIGH\nvulnerabilities?"}
-    E2 -- Yes --> E3["❌ Fail pipeline"]
-    E2 -- No --> E4["Phase 2: Docker image scan"]
-    E4 --> E5["📋 Report only\n(does not fail)"]
-
-    style C fill:#1a1a2e,stroke:#e94560,color:#fff
-    style D fill:#1a1a2e,stroke:#0f3460,color:#fff
-    style E fill:#1a1a2e,stroke:#16213e,color:#fff
-    style C3 fill:#e94560,stroke:#e94560,color:#fff
-    style E3 fill:#e94560,stroke:#e94560,color:#fff
-    style C4 fill:#2d6a4f,stroke:#2d6a4f,color:#fff
-    style D4 fill:#2d6a4f,stroke:#2d6a4f,color:#fff
-```
-
-All three jobs run **in parallel** on every trigger event. A failure in any job does not block the others — each produces its own pass/fail result and security report.
+### 9. Build, Scan & Push (`docker-build-scan-push`)
+- Configures Docker Buildx for multi-architecture support.
+- Builds the `consistium` image and loads it into the local Docker daemon.
+- **Trivy Image Scan**: Scans the compiled image for OS-level CVEs (e.g., Alpine packages).
+- Pushes the image to **GitHub Container Registry (GHCR)** automatically, tagged with the commit SHA and `latest`.
 
 ---
 
-## Security Scanning Strategy
+## Phase 3: Release & Reporting
 
-The pipeline implements a **layered defense** model, scanning progressively from the innermost layer (secrets in source code) outward to the container image that gets deployed:
+### 10a. Semantic Versioning (`semantic-versioning`)
+*(Only runs on `push` to `main`/`master`)*
+- Automatically calculates the next semantic version tag (e.g., v1.2.3) based on commit history.
+- Generates a GitHub Release containing the changelog.
+- Generates an HTML Release Document and emails it to the DevOps team using `dawidd6/action-send-mail`.
 
-| Layer | Scan Target | Tool | Threat Category |
-|-------|------------|------|-----------------|
-| 1 — Secrets | Git history & working tree | TruffleHog | Credential leakage |
-| 2 — Source Code | `app.js`, inline scripts, JS files | GitHub CodeQL | XSS, injection, logic flaws |
-| 3 — Dependencies | `package.json` / `node_modules` | Trivy (filesystem) | Known CVEs in libraries |
-| 4 — Container | Built Docker image | Trivy (image) | OS-level & runtime CVEs |
-
-This approach ensures that no single category of vulnerability can slip through unchecked. Each layer addresses a fundamentally different risk surface.
-
----
-
-## Job 1: Secret Scanning
-
-**Job name:** `secret-scan`
-**Tool:** [TruffleHog](https://github.com/trufflesecurity/trufflehog) (`trufflesecurity/trufflehog@main`)
-
-### What It Detects
-
-TruffleHog scans for accidentally committed credentials, including but not limited to:
-
-- **API keys** — AWS, GCP, Azure, Stripe, Twilio, SendGrid, etc.
-- **Passwords & tokens** — Database connection strings, OAuth tokens, JWTs
-- **Private keys** — SSH keys, TLS certificates, PGP keys
-- **Webhooks & URLs** — Slack webhooks, Discord tokens, internal service URLs
-
-### How It Works
-
-1. The repository is checked out with **`fetch-depth: 0`** (full git history), allowing TruffleHog to scan every commit — not just the latest working tree.
-2. TruffleHog uses a combination of **regex patterns** and **entropy analysis** to identify potential secrets.
-3. The `--only-verified` flag ensures TruffleHog **actively validates** discovered credentials against the respective service APIs. Only secrets confirmed to be live/active are reported.
-4. The `--debug` flag enables verbose logging for troubleshooting scan behavior.
-
-### Configuration Explained
-
-```yaml
-secret-scan:
-  name: Secret Scanning
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0    # Full history — secrets may exist in old commits
-
-    - name: TruffleHog scan
-      uses: trufflesecurity/trufflehog@main
-      with:
-        extra_args: --debug --only-verified
-```
-
-| Setting | Value | Rationale |
-|---------|-------|-----------|
-| `fetch-depth: 0` | Full clone | Secrets in old commits are still exploitable if the repo is public or cloned |
-| `--only-verified` | Enabled | Reduces noise by only flagging secrets that are confirmed active |
-| `--debug` | Enabled | Provides detailed output for diagnosing false negatives |
-
-### Example Findings
-
-| Finding | Severity | Example |
-|---------|----------|---------|
-| AWS Access Key | Critical | `AKIAIOSFODNN7EXAMPLE` found in `config.js` at commit `a1b2c3d` |
-| Stripe Secret Key | Critical | `sk_live_...` found in `.env.example` at commit `e4f5g6h` |
-| Database password | High | `mongodb://admin:P@ssw0rd@prod-db:27017` found in `docker-compose.yml` |
-
-> [!CAUTION]
-> Even if a secret is removed from the current branch, it remains in the git history forever unless the history is rewritten. TruffleHog's full-history scan catches these cases.
+### 10b. Security Report (`security-report`)
+*(Always runs, even if earlier jobs fail)*
+- Downloads the JSON artifacts generated by TruffleHog, CodeQL, Trivy (FS & Image), and Infracost.
+- Executes `security/generate-report.sh`.
+- Combines all data into a beautiful, branded HTML **DevSecOps & FinOps Report**.
+- Emails the final report to the DevOps team.
 
 ---
 
-## Job 2: CodeQL Analysis (SAST)
-
-**Job name:** `codeql-sast`
-**Tool:** [GitHub CodeQL](https://codeql.github.com/) (`github/codeql-action/init@v3` + `github/codeql-action/analyze@v3`)
-
-### What It Detects
-
-CodeQL performs **Static Application Security Testing (SAST)** on the JavaScript source code, identifying:
-
-- **Cross-Site Scripting (XSS)** — Unsanitized user input rendered in HTML responses
-- **SQL/NoSQL Injection** — Untrusted data passed directly to database queries
-- **Path Traversal** — User-controlled file paths used in `fs` operations
-- **Prototype Pollution** — Unsafe object merging that modifies `Object.prototype`
-- **Open Redirects** — Unvalidated redirect URLs derived from user input
-- **Regex Denial of Service (ReDoS)** — Catastrophic backtracking in regular expressions
-- **Insecure Randomness** — Use of `Math.random()` for security-sensitive operations
-- **Missing Authentication** — Endpoints that lack proper access control checks
-
-### How It Works
-
-1. **Initialization** — CodeQL builds a semantic database of the JavaScript codebase, including `app.js` and any inline scripts.
-2. **Analysis** — CodeQL runs hundreds of security queries against the database, tracing data flow from **sources** (user input) to **sinks** (dangerous operations).
-3. **Reporting** — Results are uploaded to the repository's **Security → Code scanning alerts** tab in GitHub.
-
-### Configuration Explained
-
-```yaml
-codeql-sast:
-  name: CodeQL Analysis
-  runs-on: ubuntu-latest
-  permissions:
-    security-events: write    # Required to upload SARIF results
-    actions: read             # Required for workflow access
-    contents: read            # Required to checkout code
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      with:
-        languages: javascript
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
-```
-
-| Setting | Value | Rationale |
-|---------|-------|-----------|
-| `languages: javascript` | JavaScript/TypeScript | Covers `app.js`, frontend scripts, and Node.js code |
-| `security-events: write` | Permission | Required to publish results to GitHub's Security tab |
-| `actions: read` | Permission | Allows the action to read workflow metadata |
-| `contents: read` | Permission | Allows checkout and code analysis |
-
-### Example Findings
-
-| Finding | CWE | Example |
-|---------|-----|---------|
-| Reflected XSS | CWE-79 | User input from `req.query.name` rendered directly in `res.send()` without escaping |
-| NoSQL Injection | CWE-943 | `req.body.username` passed directly to `db.collection.find()` |
-| Path Traversal | CWE-22 | `req.params.file` used in `fs.readFile()` without sanitization |
-| Hardcoded Credentials | CWE-798 | Password literal found in source code |
-
-> [!NOTE]
-> CodeQL results appear in the **Security** tab of the GitHub repository. They include detailed explanations, data-flow traces, and remediation guidance for each finding.
-
----
-
-## Job 3: Trivy Container & Filesystem Scan
-
-**Job name:** `trivy-scan`
-**Tool:** [Aqua Trivy](https://trivy.dev/) (`aquasecurity/trivy-action@master`)
-
-### What It Detects
-
-Trivy performs **Software Composition Analysis (SCA)** and **container image scanning**, identifying:
-
-- **Known CVEs** in npm dependencies (e.g., vulnerable versions of `express`, `lodash`)
-- **OS-level vulnerabilities** in the Docker base image (e.g., outdated `openssl`, `glibc`)
-- **Misconfigured Dockerfiles** — Running as root, exposing unnecessary ports
-- **Embedded secrets** in image layers
-- **License compliance** issues in bundled packages
-
-### How It Works — Two-Phase Scan
-
-Trivy runs in two sequential phases, each targeting a different artifact:
-
-```mermaid
-flowchart LR
-    A["Source Code &\nDependencies"] --> B["Phase 1:\nFilesystem Scan"]
-    B --> C{"CRITICAL/HIGH\nCVEs found?"}
-    C -- Yes --> D["❌ Pipeline fails\n(exit-code: 1)"]
-    C -- No --> E["Build Docker\nImage"]
-    E --> F["Phase 2:\nImage Scan"]
-    F --> G["📋 Report generated\n(exit-code: 0)"]
-
-    style D fill:#e94560,stroke:#e94560,color:#fff
-    style G fill:#2d6a4f,stroke:#2d6a4f,color:#fff
-```
-
-#### Phase 1: Filesystem Scan
-
-Scans `package.json`, `package-lock.json`, and the source tree for known vulnerabilities in dependencies.
-
-- **Scan type:** `fs` (filesystem)
-- **Exit code:** `1` — the pipeline **fails** if CRITICAL or HIGH vulnerabilities are found
-- **Severity filter:** `CRITICAL,HIGH`
-- **Ignore unfixed:** `true` — does not flag vulnerabilities with no available patch
-
-#### Phase 2: Docker Image Scan
-
-Builds the Docker image and scans all layers for OS-level and application vulnerabilities.
-
-- **Scan type:** `image`
-- **Exit code:** `0` — results are **reported only**, the pipeline does not fail
-- **Severity filter:** `CRITICAL,HIGH`
-- **Ignore unfixed:** `true`
-
-### Configuration Explained
-
-```yaml
-trivy-scan:
-  name: Trivy Container & FS Scan
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    # Phase 1 — Fail on dependency vulnerabilities
-    - name: Trivy filesystem scan
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: fs
-        exit-code: 1
-        severity: CRITICAL,HIGH
-        ignore-unfixed: true
-
-    # Phase 2 — Report container image vulnerabilities
-    - name: Build Docker image
-      run: docker build -t consistium:${{ github.sha }} .
-
-    - name: Trivy image scan
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: consistium:${{ github.sha }}
-        exit-code: 0
-        severity: CRITICAL,HIGH
-        ignore-unfixed: true
-```
-
-| Setting | Phase 1 (FS) | Phase 2 (Image) | Rationale |
-|---------|-------------|-----------------|-----------|
-| `scan-type` | `fs` | `image` | FS catches dependency CVEs; image catches OS-level CVEs |
-| `exit-code` | `1` (fail) | `0` (report) | Dependency CVEs are actionable immediately; image CVEs may need upstream fixes |
-| `severity` | `CRITICAL,HIGH` | `CRITICAL,HIGH` | Focus on exploitable, high-impact vulnerabilities |
-| `ignore-unfixed` | `true` | `true` | Avoids noise from vulnerabilities with no available remediation |
-
-### Example Findings
-
-| Finding | Phase | Severity | Example |
-|---------|-------|----------|---------|
-| CVE-2024-XXXXX in `express` | Filesystem | CRITICAL | Prototype pollution leading to RCE in Express <4.19.0 |
-| CVE-2024-YYYYY in `jsonwebtoken` | Filesystem | HIGH | Algorithm confusion allowing JWT signature bypass |
-| CVE-2024-ZZZZZ in `openssl` | Image | CRITICAL | Buffer overflow in libssl within the `node:18-alpine` base image |
-| CVE-2024-WWWWW in `libc6` | Image | HIGH | Heap overflow in glibc affecting the container runtime |
-
-> [!TIP]
-> When Trivy reports a vulnerability with a fix available, update the affected package immediately. The `ignore-unfixed: true` flag means that anything reported has a known remediation path.
-
----
-
-## Scheduled Scanning
-
-In addition to event-driven triggers (push and PR), the pipeline runs on a **weekly cron schedule**:
-
-```yaml
-on:
-  schedule:
-    - cron: '0 0 * * 0'   # Every Sunday at midnight UTC
-```
-
-### Why Continuous Scanning Matters
-
-| Scenario | Risk Without Scheduled Scans | How Weekly Scans Help |
-|----------|-----------------------------|-----------------------|
-| **New CVE disclosure** | A critical CVE is published for a dependency already in use, but no code changes trigger the pipeline | The weekly scan detects it on the next Sunday run |
-| **TruffleHog rule updates** | New secret patterns are added to TruffleHog's detection engine | The latest version is pulled weekly, catching previously undetectable secrets |
-| **CodeQL query updates** | GitHub ships new CodeQL queries for emerging vulnerability classes | Weekly runs pick up new query packs automatically |
-| **Dormant repositories** | A repository with no recent commits silently accumulates risk | Scheduled scans ensure dormant repos are not forgotten |
-
-> [!NOTE]
-> The weekly schedule uses UTC time. `0 0 * * 0` translates to **Sunday at 00:00 UTC**. GitHub Actions may delay cron runs during periods of high demand, but the scan will always execute.
-
----
-
-## Severity Policy
-
-The pipeline applies a deliberate **severity-based enforcement strategy** that balances security rigor with developer productivity.
-
-### Exit-Code Strategy
-
-| Job | Exit Code on Finding | Behavior | Rationale |
-|-----|---------------------|----------|-----------|
-| `secret-scan` | Implicit fail | **Blocks merge** | Active credentials are an immediate, exploitable risk |
-| `codeql-sast` | Report only | **Advisory** | Findings appear in the Security tab for triage; developers assess context |
-| `trivy-scan` (FS) | `1` — Fail | **Blocks merge** | Dependency CVEs with available fixes should be resolved before merge |
-| `trivy-scan` (Image) | `0` — Report | **Advisory** | Image-level CVEs often require upstream base image updates, not app changes |
-
-### Severity Filter: CRITICAL and HIGH Only
-
-The pipeline filters Trivy results to **CRITICAL** and **HIGH** severity only:
-
-- **CRITICAL** (CVSS 9.0–10.0) — Remotely exploitable, no authentication required, leads to full system compromise
-- **HIGH** (CVSS 7.0–8.9) — Significant impact, may require specific conditions to exploit
-
-Medium and low severity findings are intentionally excluded from automated enforcement to reduce alert fatigue. These should be reviewed during periodic manual security audits.
-
-### Unfixed Vulnerability Policy
-
-The `ignore-unfixed: true` flag ensures the pipeline does not fail on vulnerabilities where:
-
-- No patched version of the affected package exists
-- The fix is only available in a major version upgrade that may introduce breaking changes
-
-This prevents developers from being blocked by issues they cannot resolve, while still surfacing actionable vulnerabilities.
-
----
-
-## Security Tools Matrix
-
-| Tool | Scan Type | Target | Detects | Trigger | Fail Policy |
-|------|-----------|--------|---------|---------|-------------|
-| **TruffleHog** | Secret scanning | Full git history | API keys, passwords, tokens, private keys | Push, PR, Cron | Fails on verified secrets |
-| **GitHub CodeQL** | SAST (Static Analysis) | JavaScript source code | XSS, injection, logic bugs, insecure patterns | Push, PR, Cron | Reports to Security tab |
-| **Trivy (FS)** | SCA (Dependency scan) | `package.json`, lockfiles | Known CVEs in npm packages | Push, PR, Cron | Fails on CRITICAL/HIGH |
-| **Trivy (Image)** | Container scan | Docker image layers | OS-level CVEs, misconfigurations | Push, PR, Cron | Report only |
-
----
-
-## Job 4: Security Report Generation & Email Notification
-
-**Job name:** `security-report`
-**Tools:** Custom HTML generator + [`dawidd6/action-send-mail@v3`](https://github.com/dawidd6/action-send-mail)
-
-### What It Does
-
-The `security-report` job is the **aggregation and communication layer** of the DevSecOps pipeline. It collects scan outputs from all three upstream jobs, generates a branded HTML security report, and delivers it via email.
-
-This pattern is used by major enterprises for **audit compliance**, **stakeholder visibility**, and **security documentation**:
-
-| Company / Framework | Approach |
-|---|---|
-| **Google** | Binary Authorization + centralized security dashboards |
-| **Microsoft** | SARIF-based reporting with branded compliance docs |
-| **Netflix** | Centralized vulnerability management with aggregated dashboards |
-| **OWASP SAMM** | Recommends automated report generation (Verification practice) |
-| **SOC 2 / ISO 27001** | Requires documented evidence of security scanning |
-
-### How It Works
-
-```mermaid
-flowchart TD
-    A["secret-scan\n(TruffleHog JSON)"] --> D["security-report"]
-    B["codeql-sast\n(SARIF)"] --> D
-    C["trivy-scan\n(JSON × 2)"] --> D
-
-    D --> E["Download all\nscan artifacts"]
-    E --> F["Run generate-report.sh\n(jq + Python3)"]
-    F --> G["Branded HTML Report\nconsistium-security-report.html"]
-
-    G --> H["Upload as\nGitHub Artifact"]
-    G --> I["📧 Email to\nkalpanapramodya97@gmail.com"]
-
-    style D fill:#0d1b2a,stroke:#00d4ff,color:#fff,stroke-width:2px
-    style G fill:#1b263b,stroke:#00d4ff,color:#fff
-    style H fill:#2d6a4f,stroke:#2d6a4f,color:#fff
-    style I fill:#1a1a2e,stroke:#f59e0b,color:#fff
-```
-
-1. **Artifact collection** — Downloads JSON/SARIF outputs from all three scan jobs using `actions/download-artifact@v4`
-2. **Report generation** — Runs [`security/generate-report.sh`](../../security/generate-report.sh) which:
-   - Parses TruffleHog JSON for leaked secrets
-   - Parses CodeQL SARIF for static analysis findings
-   - Parses Trivy JSON for dependency and container vulnerabilities
-   - Calculates severity statistics and percentages
-   - Injects data into the branded HTML template
-3. **Artifact upload** — Uploads the final HTML report as a downloadable GitHub Actions artifact (90-day retention)
-4. **Email delivery** — Sends the report as an email attachment via Gmail SMTP
-
-### Report Contents
-
-The generated HTML report includes:
-
-| Section | Contents |
-|---|---|
-| **Header** | Consistium logo, "Security Scan Report" title, pipeline metadata |
-| **Metadata Bar** | Date, commit SHA, branch, run number, trigger type |
-| **Executive Summary** | Total findings count, breakdown by severity (CRITICAL/HIGH/MEDIUM/LOW) |
-| **Severity Chart** | CSS-only horizontal bar chart showing severity distribution |
-| **🔑 Secret Scanning** | TruffleHog findings table or "No issues detected" |
-| **🔍 SAST Analysis** | CodeQL findings with CWE references or "No issues detected" |
-| **🛡️ Dependency Scan** | Trivy FS CVE table (package, version, fix, severity) |
-| **🐳 Container Scan** | Trivy image CVE table (OS-level vulnerabilities) |
-| **Footer** | Generation timestamp, pipeline link, repository links |
-
-The report is **fully self-contained** — all CSS is inline, the logo is an embedded SVG, and no external resources are loaded. It renders correctly when downloaded and opened in any browser.
-
-### Configuration Explained
-
-```yaml
-security-report:
-  name: Generate Security Report
-  runs-on: ubuntu-latest
-  needs: [secret-scan, codeql-sast, trivy-scan]
-  if: always()
-  steps:
-    # 1. Download all scan artifacts
-    - uses: actions/download-artifact@v4
-      with:
-        name: trufflehog-results
-      continue-on-error: true     # Generate report even if a scan failed
-
-    # 2. Generate the branded HTML report
-    - run: bash security/generate-report.sh --trufflehog ... --output report.html
-
-    # 3. Upload as downloadable artifact
-    - uses: actions/upload-artifact@v4
-      with:
-        name: consistium-security-report
-        path: consistium-security-report.html
-
-    # 4. Email the report
-    - uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: smtp.gmail.com
-        to: kalpanapramodya97@gmail.com
-        attachments: consistium-security-report.html
-```
-
-| Setting | Value | Rationale |
-|---------|-------|-----------|
-| `needs: [secret-scan, codeql-sast, trivy-scan]` | All three jobs | Ensures all scan data is available before report generation |
-| `if: always()` | Runs unconditionally | Report documents failures and skipped scans too |
-| `continue-on-error: true` | On artifact downloads | Missing scan results are shown as "Skipped" rather than crashing |
-| `retention-days: 90` | 90-day retention | Provides sufficient audit trail for compliance |
-
-### Email Notification
-
-The report is automatically emailed as an attachment after every pipeline run.
-
-| Feature | Details |
-|---|---|
-| **SMTP Server** | `smtp.gmail.com:465` (SSL) |
-| **From** | `Consistium DevSecOps <kalpanapramodya97@gmail.com>` |
-| **To** | `kalpanapramodya97@gmail.com` |
-| **Subject** | `🛡️ Consistium Security Report — {branch} — Run #{number}` |
-| **Body** | Pipeline metadata + link to GitHub Actions run |
-| **Attachment** | `consistium-security-report.html` |
-
-#### Required GitHub Secrets
-
-Two repository secrets must be configured for email delivery:
-
-| Secret Name | Value |
-|---|---|
-| `MAIL_USERNAME` | `kalpanapramodya97@gmail.com` |
-| `MAIL_PASSWORD` | Gmail App Password (16-character code) |
-
-> [!IMPORTANT]
-> The `MAIL_PASSWORD` must be a **Gmail App Password**, not your regular Gmail password. Generate one at: Google Account → Security → 2-Step Verification → App passwords.
-
-### Report Template Architecture
-
-The report template system consists of two files in the [`security/`](../../security/) directory:
-
-| File | Purpose |
-|---|---|
-| [`report-template.html`](../../security/report-template.html) | HTML template with `{{PLACEHOLDER}}` variables and inline CSS |
-| [`generate-report.sh`](../../security/generate-report.sh) | Bash script that parses scan outputs and populates the template |
-
-The template uses a dark theme matching the Consistium app aesthetic — dark background, cyan/purple accent colors, glassmorphism cards, and the Inter font family.
-
-### How to Download Reports
-
-1. Go to **Actions** → Select a **DevSecOps Pipeline** run
-2. Scroll to the **Artifacts** section at the bottom
-3. Click **consistium-security-report** to download
-4. Open the `.html` file in any web browser
-
-Alternatively, check your email — the report is automatically sent as an attachment after every run.
-
----
-
-## Updated Pipeline Overview
-
-With the addition of the security report job, the complete DevSecOps pipeline now consists of **four jobs**:
-
-```mermaid
-flowchart TD
-    A["Trigger: Push / PR / Weekly Cron"] --> B{"DevSecOps Pipeline"}
-
-    B --> C["🔑 Job 1: secret-scan\n(TruffleHog)"]
-    B --> D["🔍 Job 2: codeql-sast\n(GitHub CodeQL)"]
-    B --> E["🛡️ Job 3: trivy-scan\n(Aqua Trivy)"]
-
-    C --> C1["JSON artifact"]
-    D --> D1["SARIF artifact"]
-    E --> E1["JSON artifacts × 2"]
-
-    C1 --> F["📊 Job 4: security-report\n(Report Generator)"]
-    D1 --> F
-    E1 --> F
-
-    F --> G["📄 Branded HTML Report"]
-    F --> H["📧 Email Notification"]
-
-    C --> C2{{"Verified secrets?"}}
-    C2 -- Yes --> C3["❌ Fail"]
-    C2 -- No --> C4["✅ Pass"]
-
-    D --> D2{{"Code issues?"}}
-    D2 -- Yes --> D3["⚠️ Security tab"]
-    D2 -- No --> D4["✅ Pass"]
-
-    E --> E2{{"FS: CRITICAL/HIGH?"}}
-    E2 -- Yes --> E3["❌ Fail"]
-    E2 -- No --> E4["Image scan\n(report only)"]
-
-    style C fill:#1a1a2e,stroke:#e94560,color:#fff
-    style D fill:#1a1a2e,stroke:#0f3460,color:#fff
-    style E fill:#1a1a2e,stroke:#16213e,color:#fff
-    style F fill:#0d1b2a,stroke:#00d4ff,color:#fff,stroke-width:2px
-    style G fill:#2d6a4f,stroke:#2d6a4f,color:#fff
-    style H fill:#1a1a2e,stroke:#f59e0b,color:#fff
-```
-
----
-
-
-The current pipeline provides strong foundational coverage across secrets, source code, dependencies, and containers. The following enhancements would extend the security posture further:
-
-### 1. Dynamic Application Security Testing (DAST)
-
-**Tool:** [OWASP ZAP](https://www.zaproxy.org/) (`zaproxy/action-full-scan@v0.10.0`)
-
-DAST tests the **running application** by sending crafted HTTP requests and analyzing responses. Unlike SAST, it finds vulnerabilities that only manifest at runtime — such as missing security headers, CORS misconfigurations, and authentication bypasses.
-
-```yaml
-# Example DAST integration
-- name: OWASP ZAP Full Scan
-  uses: zaproxy/action-full-scan@v0.10.0
-  with:
-    target: http://localhost:3000
-    rules_file_name: .zap/rules.tsv
-```
-
-### 2. Software Composition Analysis (SCA) — Continuous Monitoring
-
-**Tools:** [Dependabot](https://docs.github.com/en/code-security/dependabot) or [Snyk](https://snyk.io/)
-
-While Trivy scans at pipeline time, Dependabot and Snyk provide **continuous monitoring** with automatic pull requests when new CVEs affect the project's dependencies. This closes the gap between weekly scans.
-
-### 3. Software Bill of Materials (SBOM) Generation
-
-**Tools:** [Syft](https://github.com/anchore/syft) or [Trivy SBOM](https://aquasecurity.github.io/trivy/latest/docs/supply-chain/sbom/)
-
-Generating an SBOM for every release provides a machine-readable inventory of all components, enabling rapid impact assessment when new vulnerabilities are disclosed. SBOM formats like CycloneDX and SPDX are increasingly required by regulatory frameworks.
-
-```yaml
-# Example SBOM generation
-- name: Generate SBOM
-  uses: anchore/sbom-action@v0
-  with:
-    image: consistium:${{ github.sha }}
-    format: cyclonedx-json
-    output-file: sbom.json
-```
-
-### 4. Container Image Signing (Cosign)
-
-**Tool:** [Sigstore Cosign](https://github.com/sigstore/cosign)
-
-Signing container images with Cosign provides **supply chain integrity** by cryptographically attesting that images were built by the CI/CD pipeline and have not been tampered with. Kubernetes admission controllers (e.g., Kyverno, OPA Gatekeeper) can enforce signature verification at deployment time.
-
-```yaml
-# Example container signing
-- name: Sign container image
-  uses: sigstore/cosign-installer@v3
-- run: cosign sign --yes consistium:${{ github.sha }}
-```
-
-### Enhancement Roadmap
-
-| Enhancement | Priority | Complexity | Value |
-|------------|----------|------------|-------|
-| OWASP ZAP (DAST) | High | Medium | Catches runtime-only vulnerabilities |
-| Dependabot / Snyk (SCA) | High | Low | Continuous dependency monitoring with auto-PRs |
-| SBOM Generation | Medium | Low | Regulatory compliance, incident response |
-| Cosign (Image Signing) | Medium | Medium | Supply chain integrity, deployment assurance |
-
-> [!TIP]
-> Start with Dependabot — it requires zero pipeline changes (just a `dependabot.yml` config file) and immediately provides automated dependency update PRs with vulnerability context.
+## Configuration Reference
+
+| Component | Action / Tool Used | Config Location |
+|-----------|--------------------|-----------------|
+| HTML Linting | `htmlhint` | Workflow inline |
+| Docker Linting | `hadolint/hadolint-action@v3` | `.hadolint.yaml` |
+| Node.js Setup | `actions/setup-node@v4` | Workflow inline |
+| Terraform | `hashicorp/setup-terraform@v3` | Workflow inline |
+| TFLint | `terraform-linters/setup-tflint@v4` | `.tflint.hcl` |
+| Infracost | `infracost/actions/setup@v3` | Workflow inline |
+| CodeQL | `github/codeql-action` | Workflow inline |
+| Secret Scan | `trufflesecurity/trufflehog` | `.trufflehog-exclude` |
+| Vulnerability | `aquasecurity/trivy-action` | Workflow inline |
+| DAST | `zaproxy/action-baseline` | Workflow inline |
+| Build System| `docker/build-push-action` | `Dockerfile` |
+| Versioning | `mathieudutour/github-tag-action` | Workflow inline |

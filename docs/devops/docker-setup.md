@@ -1,46 +1,154 @@
 # Docker & Container Setup
 
-Consistium is a lightweight, static front-end habit tracker application. Its containerization strategy reflects this simplicity: a single **nginx:alpine** image serves the static assets (HTML, CSS, JavaScript) with production-grade defaults — gzip compression, long-lived cache headers, and a minimal resource footprint. An accompanying **Docker Compose** stack layers on observability through Prometheus metrics export and Grafana dashboards, and log aggregation through Loki and Promtail, giving full production visibility without bloating the core application image.
+Consistium is a full-stack habit tracking application with a **multi-stage Nginx frontend**, a **Node.js/Express backend API**, and **MongoDB** for data persistence. The containerization strategy uses **multi-stage builds** for both frontend and backend images, ensuring production-grade defaults — asset validation, security hardening, non-root execution, and minimal resource footprints. An accompanying **Docker Compose** stack layers on observability through Prometheus metrics, Alertmanager for alert routing, Grafana dashboards, and log aggregation through Loki and Promtail, giving full production visibility without bloating the core application images.
 
-The entire stack — app, metrics exporter, time-series database, and dashboard — runs comfortably on a single machine with under **256 MB of total RAM**, making it ideal for personal servers, Raspberry Pi deployments, and CI/CD preview environments.
+The entire stack — app, backend, database, metrics, alerting, logs, and dashboards — runs on a single machine, making it ideal for development, personal servers, and CI/CD preview environments.
 
 ---
 
-## Dockerfile Breakdown
+## Frontend Dockerfile — Multi-Stage Build
+
+The frontend uses a two-stage build process: validation followed by production image assembly.
 
 ```dockerfile
-FROM nginx:alpine
-RUN rm -rf /usr/share/nginx/html/*
-COPY index.html /usr/share/nginx/html/
-COPY style.css /usr/share/nginx/html/
-COPY app.js /usr/share/nginx/html/
-COPY nginx.conf /etc/nginx/nginx.conf
+# ── Stage 1: Asset Validation ────────────────────────────────
+FROM alpine:3.21 AS validator
+
+WORKDIR /assets
+
+COPY index.html admin.html style.css app.js ./
+COPY assets/ ./assets/
+COPY nginx.conf ./nginx.conf
+
+RUN set -e && \
+    echo "── Validating static assets ──" && \
+    for f in index.html admin.html style.css app.js nginx.conf; do \
+      if [ ! -s "$f" ]; then \
+        echo "ERROR: $f is missing or empty" && exit 1; \
+      fi; \
+      echo "  ✓ $f ($(wc -c < "$f") bytes)"; \
+    done && \
+    echo "── All assets validated ──"
+
+# ── Stage 2: Production Image ────────────────────────────────
+FROM nginx:1.27-alpine AS production
+
+LABEL org.opencontainers.image.title="Consistium" \
+      org.opencontainers.image.description="Consistium Habit Tracker" \
+      org.opencontainers.image.authors="Kalpana Pramodya" \
+      org.opencontainers.image.source="https://github.com/Kalpanapramodya97/consistium" \
+      org.opencontainers.image.licenses="AGPL-3.0"
+
+RUN rm -rf /usr/share/nginx/html/* && \
+    apk --no-cache del curl || true && \
+    mkdir -p /var/cache/nginx/client_temp \
+             /var/cache/nginx/proxy_temp \
+             /var/cache/nginx/fastcgi_temp \
+             /var/cache/nginx/uwsgi_temp \
+             /var/cache/nginx/scgi_temp \
+             /tmp/nginx && \
+    chown -R 101:101 /var/cache/nginx /tmp/nginx /var/log/nginx && \
+    chmod -R 755 /var/cache/nginx /tmp/nginx
+
+COPY --from=validator --chown=101:101 /assets/index.html /usr/share/nginx/html/
+COPY --from=validator --chown=101:101 /assets/admin.html /usr/share/nginx/html/
+COPY --from=validator --chown=101:101 /assets/style.css /usr/share/nginx/html/
+COPY --from=validator --chown=101:101 /assets/app.js /usr/share/nginx/html/
+COPY --from=validator --chown=101:101 /assets/assets/ /usr/share/nginx/html/assets/
+
+COPY --chown=101:101 nginx.conf /etc/nginx/nginx.conf
+
+USER 101
+
 EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+
 CMD ["nginx", "-g", "daemon off;"]
 ```
 
-### Line-by-Line Explanation
+### Stage-by-Stage Explanation
 
-| Line | Directive | Purpose |
-|------|-----------|---------|
-| 1 | `FROM nginx:alpine` | Uses the official Nginx image built on Alpine Linux — a security-focused, minimal distribution. Alpine produces images that are roughly **~40 MB** compared to **~140 MB** for Debian-based Nginx images. |
-| 2 | `RUN rm -rf /usr/share/nginx/html/*` | Removes the default Nginx welcome page and placeholder files. This ensures only Consistium's assets are served, eliminating information leakage from default content. |
-| 3–5 | `COPY index.html ...` | Copies the three static application files into Nginx's document root. Each file is copied individually rather than using a wildcard (`COPY . ...`) to avoid accidentally bundling development files (e.g., `node_modules`, `.git`, `docker-compose.yml`) into the image. |
-| 6 | `COPY nginx.conf ...` | Replaces the default Nginx configuration with a custom one optimized for static-site serving, compression, caching, and metrics exposure. |
-| 7 | `EXPOSE 80` | Documents that the container listens on port 80. This is metadata for orchestrators and developers — it does not actually publish the port. |
-| 8 | `CMD ["nginx", "-g", "daemon off;"]` | Starts Nginx in the **foreground**. By default Nginx daemonizes itself, which would cause the container to exit immediately. The `daemon off` directive keeps the master process in the foreground so Docker can track its lifecycle and forward signals correctly. |
+| Stage | Base Image | Purpose |
+|-------|-----------|---------|
+| **Stage 1: Validator** | `alpine:3.21` | Copies all static files and validates that each required file exists and is non-empty. Catches missing assets at **build time** rather than runtime, preventing broken deployments. |
+| **Stage 2: Production** | `nginx:1.27-alpine` | The production image — uses a **pinned** Nginx version (not `latest`), removes default content, creates temp directories for non-root Nginx, sets ownership to UID 101 (nginx user), and runs as non-root. |
 
-### Why Alpine?
+### Security Hardening
 
-- **Minimal attack surface**: Alpine ships with musl libc and BusyBox instead of glibc and GNU coreutils, resulting in far fewer installed packages and a smaller CVE footprint.
-- **Fast pulls and deploys**: A ~40 MB image transfers quickly over the network, reducing CI/CD pipeline times and cold-start latency in orchestrators like Kubernetes.
-- **Sufficient for static serving**: Consistium has no server-side runtime dependencies (no Node.js, no Python). Nginx on Alpine is a purpose-built fit.
+| Control | Implementation |
+|---------|---------------|
+| **Non-root execution** | `USER 101` (nginx user) — the container never runs as root |
+| **Package reduction** | Removes `curl` to minimize attack surface |
+| **Directory ownership** | All writable directories owned by nginx user (UID 101) |
+| **OCI Image Labels** | Standard metadata for registry scanners and compliance tools |
+| **Health check** | Uses `wget` (available in Alpine) instead of `curl` |
+| **Asset validation** | Stage 1 ensures no broken deployments from missing files |
 
-### Why Nginx?
+### Why Multi-Stage?
 
-- **Battle-tested performance**: Nginx's event-driven architecture handles thousands of concurrent connections with minimal memory overhead — far more efficient than a Node.js static server for pure file serving.
-- **Built-in compression and caching**: Native `gzip` and `expires` directives eliminate the need for external middleware.
-- **Prometheus integration**: The `stub_status` module provides connection metrics out of the box, enabling observability without application-level instrumentation.
+The validator stage serves as a **build-time gate**. Without it, a missing `app.js` would only be discovered when a user hits a 404 in production. With validation, the Docker build itself fails with a clear error message, catching the problem in CI/CD.
+
+---
+
+## Backend Dockerfile — Multi-Stage Build
+
+The backend API uses a two-stage build process: dependency installation followed by a minimal production image.
+
+```dockerfile
+# ── Stage 1: Dependency Builder ──────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+
+RUN npm ci --omit=dev && \
+    npm cache clean --force
+
+# ── Stage 2: Production Image ────────────────────────────────
+FROM node:20-alpine AS production
+
+LABEL org.opencontainers.image.title="Consistium Backend" \
+      org.opencontainers.image.description="Consistium Habit Tracker API — Express.js backend"
+
+RUN apk add --no-cache dumb-init
+
+WORKDIR /usr/src/app
+
+ENV NODE_ENV=production \
+    PORT=5000
+
+USER node
+
+COPY --from=builder --chown=node:node /usr/src/app/node_modules ./node_modules
+COPY --chown=node:node . .
+
+EXPOSE 5000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:5000/api/health || exit 1
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "server.js"]
+```
+
+### Stage-by-Stage Explanation
+
+| Stage | Base Image | Purpose |
+|-------|-----------|---------|
+| **Stage 1: Builder** | `node:20-alpine` | Installs production dependencies only (`--omit=dev`), excluding test frameworks and dev tools. Cleans npm cache to reduce layer size. |
+| **Stage 2: Production** | `node:20-alpine` | Installs `dumb-init` for proper PID 1 signal handling, copies only production `node_modules` from the builder, and runs as the built-in `node` user. |
+
+### Why dumb-init?
+
+Node.js does not handle signals properly when running as PID 1 in a container. Without `dumb-init`:
+
+- `SIGTERM` (sent by `docker stop` and Kubernetes pod termination) is **ignored**, causing a 10-second timeout followed by `SIGKILL`.
+- Zombie processes from child processes are not reaped.
+
+`dumb-init` wraps the Node.js process, forwarding signals correctly and reaping zombies, enabling **graceful shutdown** — active requests complete before the process exits.
 
 ---
 
@@ -59,9 +167,9 @@ events {
 ```
 
 | Directive | Value | Rationale |
-|-----------|-------|-----------|
-| `worker_processes` | `1` | A single worker is sufficient for a personal habit tracker. Each worker consumes memory, and one process can handle the expected concurrency. For higher traffic, set this to `auto` to match available CPU cores. |
-| `worker_connections` | `128` | The maximum number of simultaneous connections per worker. For a static site with a single user (or a small team), 128 is generous. The default of 1024 would waste kernel memory on unused connection slots. |
+|-----------|-------|-----------| 
+| `worker_processes` | `1` | A single worker is sufficient for a personal habit tracker. For higher traffic, set to `auto`. |
+| `worker_connections` | `128` | Maximum simultaneous connections per worker. Generous for a single user or small team. |
 
 ### Gzip Compression
 
@@ -72,10 +180,10 @@ gzip_min_length 256;
 ```
 
 | Directive | Value | Rationale |
-|-----------|-------|-----------|
-| `gzip on` | — | Enables on-the-fly gzip compression for responses. This reduces transfer sizes by **60–80%** for text-based assets. |
-| `gzip_types` | `text/css application/javascript text/html` | Compresses CSS, JavaScript, and HTML files. Binary formats (images, fonts) are excluded because they are already compressed and gzipping them wastes CPU cycles. |
-| `gzip_min_length` | `256` | Responses smaller than 256 bytes are not compressed. Tiny responses see negligible size reduction but still incur CPU overhead and gzip framing bytes, sometimes making the output *larger* than the original. |
+|-----------|-------|-----------| 
+| `gzip on` | — | Enables on-the-fly gzip compression. Reduces transfer sizes by **60–80%** for text assets. |
+| `gzip_types` | CSS, JS, HTML | Binary formats (images) are excluded — they are already compressed. |
+| `gzip_min_length` | `256` | Responses under 256 bytes see negligible benefit from compression. |
 
 ### Static Asset Caching
 
@@ -87,9 +195,9 @@ location ~* \.(css|js|html)$ {
 ```
 
 | Directive | Value | Rationale |
-|-----------|-------|-----------|
-| `expires` | `7d` | Sets the `Expires` header to 7 days in the future. Browsers will serve these files from their local cache without contacting the server for a full week, reducing bandwidth and improving perceived load times. |
-| `Cache-Control` | `public, immutable` | `public` allows CDNs and shared caches to store the response. `immutable` tells the browser that the resource will **never change** during its freshness lifetime, preventing conditional revalidation requests (e.g., `If-Modified-Since` checks). This is safe because a new deployment rebuilds the Docker image with updated files. |
+|-----------|-------|-----------| 
+| `expires` | `7d` | Browsers serve from cache for 7 days without contacting the server. |
+| `Cache-Control` | `public, immutable` | `immutable` prevents revalidation requests during the freshness window. Safe because new deployments rebuild the Docker image. |
 
 ### Stub Status Endpoint
 
@@ -99,16 +207,7 @@ location /stub_status {
 }
 ```
 
-The `stub_status` module exposes a plain-text page with real-time Nginx connection metrics:
-
-```
-Active connections: 2
-server accepts handled requests
- 15 15 45
-Reading: 0 Writing: 1 Waiting: 1
-```
-
-This endpoint is scraped by the **nginx-prometheus-exporter** sidecar service every few seconds and converted into Prometheus-compatible metrics (e.g., `nginx_connections_active`, `nginx_http_requests_total`). It is lightweight — no logs, no JSON parsing — and adds negligible overhead.
+Exposes real-time Nginx connection metrics, scraped by the nginx-prometheus-exporter sidecar service.
 
 ### SPA-Style Routing
 
@@ -118,115 +217,212 @@ location / {
 }
 ```
 
-The `try_files` directive attempts to serve the requested URI as a file, then as a directory, and finally falls back to `index.html`. This enables client-side routing: if a user navigates directly to `/settings` or `/dashboard`, Nginx serves `index.html` instead of returning a 404, allowing the JavaScript application to handle the route.
+Enables client-side routing: if a user navigates directly to `/settings` or `/dashboard`, Nginx serves `index.html` instead of returning a 404.
 
 ---
 
 ## Docker Compose Services
 
-The `docker-compose.yml` defines six services that form a complete application-plus-observability stack:
+The `docker-compose.yml` defines **nine services** forming a complete application-plus-observability stack:
 
 ```mermaid
 graph LR
     A["Browser :3000"] --> B["consistium (nginx)"]
+    B -->|"API proxy"| BB["backend (Express) :5000"]
+    BB -->|"mongoose"| DB["mongodb :27017"]
     B -->|":80/stub_status"| C["nginx-exporter :9113"]
-    C -->|"metrics"| D["prometheus :9090"]
-    D -->|"data source"| E["grafana :3001"]
+    BB -->|"/api/metrics"| D2["prometheus :9090"]
+    C -->|"metrics"| D2
+    D2 -->|"alerts"| AM["alertmanager :9093"]
+    D2 -->|"data source"| E["grafana :3001"]
     B -->|"container logs"| F["promtail :9080"]
+    BB -->|"container logs"| F
     F -->|"push"| G["loki :3100"]
     G -->|"data source"| E
 ```
 
-### 1. `consistium` — Application Server
+### 1. `consistium` — Frontend Server
 
 ```yaml
 consistium:
   build: .
+  container_name: consistium
   ports:
     - "3000:80"
   restart: unless-stopped
+  depends_on:
+    - backend
   deploy:
     resources:
       limits:
-        cpus: "0.25"
+        cpus: '0.25'
         memory: 32M
       reservations:
-        cpus: "0.05"
+        cpus: '0.05'
         memory: 8M
   healthcheck:
-    test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
+    test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
     interval: 30s
     timeout: 5s
     retries: 3
-    start_period: 10s
 ```
 
-| Field | Value | Purpose |
-|-------|-------|---------|
-| `build: .` | Builds from the Dockerfile in the project root. |
-| `ports: "3000:80"` | Maps host port **3000** to container port **80**. Users access the app at `http://localhost:3000`. |
-| `restart: unless-stopped` | Automatically restarts the container on crash or host reboot, but not if the user explicitly stops it with `docker compose stop`. |
-| `deploy.resources` | See [Resource Management](#resource-management) below. |
-| `healthcheck` | See [Health Checks](#health-checks) below. |
+| Field | Purpose |
+|-------|---------|
+| `build: .` | Builds from the multi-stage Dockerfile in the project root. |
+| `ports: "3000:80"` | Maps host port **3000** to container port **80**. |
+| `depends_on: backend` | Ensures the backend API starts before the frontend. |
+| `deploy.resources` | Memory limit 32M, CPU limit 0.25 cores (see [Resource Management](#resource-management)). |
+| `healthcheck` | Uses `wget` to verify the container is responsive. |
 
-### 2. `nginx-exporter` — Metrics Bridge
+### 2. `backend` — Express API Server
+
+```yaml
+backend:
+  build: ./backend
+  container_name: backend
+  ports:
+    - "5000:5000"
+  environment:
+    - MONGODB_URI=mongodb://mongodb:27017/consistium
+    - JWT_SECRET=super_secret_consistium_key_change_in_prod
+    - PORT=5000
+  depends_on:
+    - mongodb
+  restart: unless-stopped
+```
+
+| Field | Purpose |
+|-------|---------|
+| `build: ./backend` | Builds from the multi-stage Dockerfile in `./backend/`. |
+| `ports: "5000:5000"` | Exposes the Express API on port 5000. |
+| `environment` | Sets MongoDB connection URI, JWT secret, and server port. |
+| `depends_on: mongodb` | Ensures MongoDB starts before the backend attempts to connect. |
+
+> [!WARNING]
+> The `JWT_SECRET` in the compose file is a development placeholder. **Always** use a strong, unique secret in production, stored in environment variables or a secret manager.
+
+### 3. `mongodb` — Document Database
+
+```yaml
+mongodb:
+  image: mongo:6
+  container_name: mongodb
+  ports:
+    - "27017:27017"
+  volumes:
+    - mongodb_data:/data/db
+  restart: unless-stopped
+```
+
+| Field | Purpose |
+|-------|---------|
+| `image: mongo:6` | Official MongoDB 6 image. |
+| `ports: "27017:27017"` | Exposes MongoDB for direct access and debugging. |
+| `volumes` | Named volume `mongodb_data` persists data across container restarts. |
+
+### 4. `nginx-exporter` — Metrics Bridge
 
 ```yaml
 nginx-exporter:
   image: nginx/nginx-prometheus-exporter:1.1.0
-  command: ["-nginx.scrape-uri=http://consistium:80/stub_status"]
+  container_name: nginx-exporter
+  command:
+    - -nginx.scrape-uri=http://consistium:80/stub_status
   ports:
     - "9113:9113"
   depends_on:
     - consistium
+  restart: unless-stopped
 ```
 
-| Field | Value | Purpose |
-|-------|-------|---------|
-| `image` | `nginx/nginx-prometheus-exporter:1.1.0` | Official exporter maintained by the Nginx team. Converts `stub_status` output into Prometheus metrics. |
-| `command` | `-nginx.scrape-uri=...` | Tells the exporter where to find the stub_status endpoint. Uses the Docker Compose service name `consistium` as the hostname, which resolves via Docker's internal DNS. |
-| `ports: "9113:9113"` | Exposes the Prometheus metrics endpoint on the host for debugging (`curl http://localhost:9113/metrics`). |
-| `depends_on` | `consistium` | Ensures the app container starts before the exporter attempts to scrape it. |
+| Field | Purpose |
+|-------|---------|
+| `image` | Official exporter by Nginx Inc. Converts `stub_status` into Prometheus metrics. |
+| `command` | Points to the Nginx stub_status endpoint via Docker DNS. |
+| `ports: "9113:9113"` | Exposes Prometheus metrics endpoint for debugging. |
 
-### 3. `prometheus` — Time-Series Database
+### 5. `prometheus` — Time-Series Database & Alert Evaluation
 
 ```yaml
 prometheus:
   image: prom/prometheus:v2.51.0
+  container_name: prometheus
   volumes:
-    - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml
+    - ./prometheus/recording-rules.yml:/etc/prometheus/recording-rules.yml
   ports:
     - "9090:9090"
   depends_on:
-    - nginx-exporter
+    - alertmanager
+  restart: unless-stopped
+  command:
+    - '--config.file=/etc/prometheus/prometheus.yml'
+    - '--storage.tsdb.path=/prometheus'
+    - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+    - '--web.console.templates=/usr/share/prometheus/consoles'
+    - '--web.enable-lifecycle'
 ```
 
-| Field | Value | Purpose |
-|-------|-------|---------|
-| `image` | `prom/prometheus:v2.51.0` | Pinned to a specific version for reproducibility. Prometheus scrapes the nginx-exporter at a configurable interval (typically 15s) and stores metrics in its embedded TSDB. |
-| `volumes` | Bind-mounts the local `prometheus.yml` configuration file, which defines scrape targets (the nginx-exporter on port 9113). |
-| `ports: "9090:9090"` | Exposes the Prometheus web UI and API for ad-hoc queries via PromQL. |
+| Field | Purpose |
+|-------|---------|
+| `image` | Pinned to v2.51.0 for reproducibility. |
+| `volumes` | Bind-mounts config file, alert rules, and recording rules. |
+| `depends_on: alertmanager` | Ensures Alertmanager is available before Prometheus starts sending alerts. |
+| `command` | Enables lifecycle API (`POST /-/reload`) for hot-reloading configuration. |
 
-### 4. `grafana` — Dashboard & Visualization
+### 6. `alertmanager` — Alert Routing & Email Delivery
+
+```yaml
+alertmanager:
+  image: prom/alertmanager:v0.27.0
+  container_name: alertmanager
+  volumes:
+    - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    - ./alertmanager/templates:/etc/alertmanager/templates
+  ports:
+    - "9093:9093"
+  env_file:
+    - .env
+  entrypoint:
+    - 'sh'
+    - '-c'
+    - 'sed "s/\$${SMTP_PASSWORD}/$$SMTP_PASSWORD/g" /etc/alertmanager/alertmanager.yml > /tmp/alertmanager.yml && /bin/alertmanager --config.file=/tmp/alertmanager.yml --storage.path=/alertmanager --web.external-url=http://localhost:9093'
+  restart: unless-stopped
+```
+
+| Field | Purpose |
+|-------|---------|
+| `image` | Alertmanager v0.27.0 for alert routing, grouping, and notification. |
+| `volumes` | Config file and custom HTML email templates. |
+| `env_file: .env` | Loads `SMTP_PASSWORD` from the `.env` file for email delivery. |
+| `entrypoint` | Substitutes the SMTP password placeholder in the config file at runtime, preventing secrets from being committed to version control. |
+
+### 7. `grafana` — Dashboard & Visualization
 
 ```yaml
 grafana:
   image: grafana/grafana:10.4.1
+  container_name: grafana
   environment:
     - GF_SECURITY_ADMIN_PASSWORD=admin
   ports:
     - "3001:3000"
-  depends_on:
-    - prometheus
+  volumes:
+    - ./grafana/provisioning:/etc/grafana/provisioning
+    - ./grafana/dashboards:/var/lib/grafana/dashboards
+  restart: unless-stopped
 ```
 
-| Field | Value | Purpose |
-|-------|-------|---------|
-| `image` | `grafana/grafana:10.4.1` | Pinned version of Grafana for dashboard rendering and alerting. |
-| `environment` | `GF_SECURITY_ADMIN_PASSWORD=admin` | Sets the initial admin password. **Change this in production** or use Docker secrets. |
-| `ports: "3001:3000"` | Maps host port **3001** to Grafana's default port 3000. Access dashboards at `http://localhost:3001`. The host port is offset to avoid conflicts with the Consistium app on port 3000. |
+| Field | Purpose |
+|-------|---------|
+| `image` | Pinned Grafana version for dashboard rendering. |
+| `environment` | Default admin password. **Change this in production**. |
+| `ports: "3001:3000"` | Host port 3001 to avoid conflict with the app on port 3000. |
+| `volumes` | Auto-provisioned data sources and dashboards — Grafana starts pre-configured. |
 
-### 5. `loki` — Log Aggregation Engine
+### 8. `loki` — Log Aggregation Engine
 
 ```yaml
 loki:
@@ -240,14 +436,12 @@ loki:
   restart: unless-stopped
 ```
 
-| Field | Value | Purpose |
-|-------|-------|---------|
-| `image` | `grafana/loki:2.9.2` | Loki is a log aggregation system by Grafana Labs. It indexes metadata (labels) rather than log content, making it lightweight and cost-efficient. |
-| `ports: "3100:3100"` | Exposes the Loki API and push endpoint on the host for debugging and direct LogQL queries. |
-| `volumes` | Bind-mounts the local `loki-config.yml` configuration file, which defines storage backend, schema, and ring configuration. |
-| `command` | Overrides the default config path to use the bind-mounted configuration file. |
+| Field | Purpose |
+|-------|---------|
+| `image` | Loki indexes metadata (labels) rather than log content, making it lightweight. |
+| `ports: "3100:3100"` | Exposes the Loki API for LogQL queries. |
 
-### 6. `promtail` — Log Collection Agent
+### 9. `promtail` — Log Collection Agent
 
 ```yaml
 promtail:
@@ -261,16 +455,36 @@ promtail:
   restart: unless-stopped
 ```
 
-| Field | Value | Purpose |
-|-------|-------|---------|
-| `image` | `grafana/promtail:latest` | Promtail is Loki's dedicated log shipping agent. It discovers containers via the Docker socket and tails their logs. |
-| `volumes` (config) | Bind-mounts the Promtail configuration file defining scrape targets, label extraction, and the Loki push URL. |
-| `volumes` (containers) | Mounts `/var/lib/docker/containers` as **read-only** (`ro`) to access container log files on disk. |
-| `volumes` (socket) | Mounts the Docker socket to enable **Docker service discovery** — Promtail automatically discovers running containers without static configuration. |
-| `command` | Points Promtail to the bind-mounted configuration file. |
+| Field | Purpose |
+|-------|---------|
+| `image` | Loki's dedicated log shipping agent. |
+| `volumes (containers)` | Read-only access to container log files on disk. |
+| `volumes (socket)` | Docker socket for automatic container discovery. |
 
 > [!WARNING]
-> Mounting the Docker socket (`/var/run/docker.sock`) grants the container access to the Docker API. In production, consider using a read-only Docker socket proxy to limit exposure.
+> Mounting the Docker socket (`/var/run/docker.sock`) grants the container access to the Docker API. In production, consider using a read-only Docker socket proxy.
+
+### 10. `ansible-runner` — Automation (One-Shot)
+
+```yaml
+ansible-runner:
+  build:
+    context: .
+    dockerfile: ansible/Dockerfile
+  container_name: ansible-runner
+  volumes:
+    - .:/workspace
+    - C:/Users/u/Downloads:/downloads
+  restart: "no"
+```
+
+| Field | Purpose |
+|-------|---------|
+| `build` | Builds from `ansible/Dockerfile` with the project root as context. |
+| `volumes` | Mounts the workspace and a local downloads directory for report output. |
+| `restart: "no"` | Runs once and exits — does not restart like long-running services. |
+
+The ansible-runner executes the security report generation playbook, which runs TruffleHog secret scanning, Trivy vulnerability scanning, and generates a branded HTML security report.
 
 ---
 
@@ -280,10 +494,10 @@ promtail:
 deploy:
   resources:
     limits:
-      cpus: "0.25"
+      cpus: '0.25'
       memory: 32M
     reservations:
-      cpus: "0.05"
+      cpus: '0.05'
       memory: 8M
 ```
 
@@ -301,14 +515,12 @@ Nginx serving static files is remarkably lightweight:
 
 - The **master process** uses ~2–4 MB of RSS.
 - Each **worker process** uses ~4–8 MB under load.
-- With `worker_processes 1` and `worker_connections 128`, peak memory rarely exceeds **12–15 MB** even under sustained traffic.
-- The 32 MB limit provides a **2× safety margin** for connection spikes, log buffering, and gzip compression buffers.
-
-By contrast, a Node.js static server (e.g., `serve` or `http-server`) typically consumes **40–80 MB** at idle due to the V8 heap, which would exceed this limit before serving a single request.
+- With `worker_processes 1` and `worker_connections 128`, peak memory rarely exceeds **12–15 MB**.
+- The 32 MB limit provides a **2× safety margin** for connection spikes and gzip buffers.
 
 ### Why Reserve 8 MB
 
-The 8 MB reservation ensures the container is not starved by noisy neighbors on a shared host. Even under host-wide memory pressure, Docker's memory cgroup guarantees this minimum allocation, preventing Nginx from being OOM-killed during garbage collection storms in co-located services.
+The 8 MB reservation ensures the container is not starved by noisy neighbors on a shared host. Even under host-wide memory pressure, Docker's memory cgroup guarantees this minimum.
 
 ---
 
@@ -316,7 +528,7 @@ The 8 MB reservation ensures the container is not starved by noisy neighbors on 
 
 ```yaml
 healthcheck:
-  test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
+  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
   interval: 30s
   timeout: 5s
   retries: 3
@@ -327,11 +539,11 @@ healthcheck:
 
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
-| `test` | `wget --spider -q http://localhost:80/` | Sends an HTTP HEAD request (`--spider`) to the root URL silently (`-q`). Uses `wget` because it is available in Alpine by default; `curl` is not. Exit code 0 = healthy, non-zero = unhealthy. |
-| `interval` | `30s` | Docker runs the health check every 30 seconds. This is frequent enough to detect failures within a minute but infrequent enough to avoid measurable overhead on a static site. |
-| `timeout` | `5s` | If the health check does not complete within 5 seconds, it is considered failed. For a local loopback request serving a static file, this is extremely generous — responses should return in under 10 ms. |
-| `retries` | `3` | The container is marked **unhealthy** only after 3 consecutive failures. This prevents transient blips (e.g., a brief CPU spike during gzip compression) from triggering false alarms. |
-| `start_period` | `10s` | Docker ignores health check failures during the first 10 seconds after the container starts. This grace period allows Nginx to complete initialization, load configuration, and bind to port 80 before being evaluated. |
+| `test` | `wget --no-verbose --tries=1 --spider http://localhost:80/` | HTTP HEAD request. Uses `wget` because it is available in Alpine by default; `curl` is not. Exit code 0 = healthy. |
+| `interval` | `30s` | Health check frequency. |
+| `timeout` | `5s` | Maximum response time before failure. |
+| `retries` | `3` | Container marked **unhealthy** after 3 consecutive failures. |
+| `start_period` | `10s` | Grace period for container initialization. |
 
 ### Health State Lifecycle
 
@@ -346,7 +558,7 @@ stateDiagram-v2
     Restarting --> Starting : Container restarts
 ```
 
-When combined with `restart: unless-stopped`, an unhealthy container is automatically restarted by Docker, providing self-healing behavior without external orchestration.
+When combined with `restart: unless-stopped`, an unhealthy container is automatically restarted by Docker.
 
 ---
 
@@ -354,29 +566,39 @@ When combined with `restart: unless-stopped`, an unhealthy container is automati
 
 ### Docker Compose Default Network
 
-Docker Compose automatically creates a **bridge network** for the stack (e.g., `consistium_default`). All six services are attached to this network and can communicate using their **service names** as hostnames.
+Docker Compose automatically creates a **bridge network** for the stack (e.g., `consistium_default`). All nine services are attached to this network and can communicate using their **service names** as hostnames.
 
 ```mermaid
 graph TB
     subgraph "Docker Bridge Network (consistium_default)"
         A["consistium<br/>nginx :80"]
+        BA["backend<br/>Express :5000"]
+        MA["mongodb<br/>:27017"]
         B["nginx-exporter<br/>:9113"]
         C["prometheus<br/>:9090"]
+        AM["alertmanager<br/>:9093"]
         D["grafana<br/>:3000"]
         E["loki<br/>:3100"]
         F["promtail<br/>:9080"]
     end
 
+    A -- "API proxy" --> BA
+    BA -- "mongoose :27017" --> MA
     A -- "stub_status :80" --> B
+    BA -- "/api/metrics :5000" --> C
     B -- "metrics :9113" --> C
+    C -- "alerts :9090" --> AM
     C -- "data source :9090" --> D
     F -- "push :3100" --> E
     E -- "data source :3100" --> D
 
     subgraph "Host Machine"
         G[":3000 → consistium:80"]
+        GB[":5000 → backend:5000"]
+        GM[":27017 → mongodb:27017"]
         H[":9113 → exporter:9113"]
         I[":9090 → prometheus:9090"]
+        IA[":9093 → alertmanager:9093"]
         J[":3001 → grafana:3000"]
         K[":3100 → loki:3100"]
     end
@@ -386,25 +608,33 @@ graph TB
 
 | Source | Destination | Mechanism |
 |--------|-------------|-----------|
-| `nginx-exporter` | `consistium:80/stub_status` | Docker DNS resolves `consistium` to the container's internal IP. Traffic stays on the bridge network — it never touches the host's network stack. |
-| `prometheus` | `nginx-exporter:9113/metrics` | Same mechanism. Prometheus's `scrape_configs` references the service name. |
-| `grafana` | `prometheus:9090` | Grafana's data source configuration uses `http://prometheus:9090` as the URL. |
-| `promtail` | `loki:3100/loki/api/v1/push` | Docker DNS resolves `loki` to the container's internal IP. Promtail pushes log entries to Loki's HTTP API. |
-| `grafana` | `loki:3100` | Grafana queries Loki as a data source for log visualization. |
+| `consistium` | `backend:5000` | Nginx reverse proxy. API requests forwarded to the backend service. |
+| `backend` | `mongodb:27017` | Mongoose ODM connects via Docker DNS. |
+| `nginx-exporter` | `consistium:80/stub_status` | Docker DNS resolution. Traffic stays on the bridge network. |
+| `prometheus` | `nginx-exporter:9113/metrics` | Scrape config references the service name. |
+| `prometheus` | `backend:5000/api/metrics` | Scrapes prom-client metrics from the Express backend. |
+| `prometheus` | `alertmanager:9093` | Sends firing alerts to Alertmanager for routing. |
+| `grafana` | `prometheus:9090` | Data source for metrics dashboards. |
+| `promtail` | `loki:3100/loki/api/v1/push` | Pushes container log entries to Loki's HTTP API. |
+| `grafana` | `loki:3100` | Data source for log visualization. |
 
 ### Port Mappings (Host ↔ Container)
 
 | Host Port | Container Port | Service | Purpose |
 |-----------|---------------|---------|---------|
 | `3000` | `80` | consistium | Application access |
+| `5000` | `5000` | backend | API access |
+| `27017` | `27017` | mongodb | Database access / debugging |
 | `9113` | `9113` | nginx-exporter | Metrics debugging |
 | `9090` | `9090` | prometheus | PromQL queries & UI |
+| `9093` | `9093` | alertmanager | Alert management UI |
 | `3001` | `3000` | grafana | Dashboard access |
 | `3100` | `3100` | loki | Log aggregation API |
 | — | `9080` | promtail | Internal (no host port) |
+| — | — | ansible-runner | One-shot task (no ports) |
 
 > [!NOTE]
-> Internal container-to-container traffic uses the **container ports** (e.g., `80`, `9113`). Host port mappings are only relevant for external access from the host machine or network.
+> Internal container-to-container traffic uses the **container ports** (e.g., `80`, `5000`, `27017`). Host port mappings are only relevant for external access from the host machine or network.
 
 ---
 
@@ -426,7 +656,7 @@ docker compose up -d
 # Stop and remove containers, networks
 docker compose down
 
-# Stop and remove containers, networks, AND volumes (clears Prometheus data)
+# Stop and remove containers, networks, AND volumes (clears MongoDB data)
 docker compose down -v
 ```
 
@@ -437,7 +667,7 @@ docker compose down -v
 docker compose logs -f
 
 # Follow logs for a specific service
-docker compose logs -f consistium
+docker compose logs -f backend
 
 # Show last 100 lines
 docker compose logs --tail=100
@@ -446,11 +676,14 @@ docker compose logs --tail=100
 ### Rebuilding After Code Changes
 
 ```bash
-# Rebuild only the app image and restart it
+# Rebuild only the frontend image and restart
 docker compose up -d --build consistium
 
+# Rebuild only the backend image and restart
+docker compose up -d --build backend
+
 # Force a full rebuild (no cache)
-docker compose build --no-cache consistium
+docker compose build --no-cache
 docker compose up -d
 ```
 
@@ -462,6 +695,16 @@ docker compose ps
 
 # Detailed health check output for the app
 docker inspect --format='{{json .State.Health}}' consistium
+
+# Backend health check
+docker inspect --format='{{json .State.Health}}' backend
+```
+
+### Running the Ansible Security Report
+
+```bash
+# Run the ansible-runner service (one-shot)
+docker compose run --rm ansible-runner ansible-playbook -i inventory.yml run-security-report.yml
 ```
 
 ### Accessing Services
@@ -469,7 +712,10 @@ docker inspect --format='{{json .State.Health}}' consistium
 | Service | URL |
 |---------|-----|
 | Consistium App | [http://localhost:3000](http://localhost:3000) |
+| Backend API | [http://localhost:5000/api/health](http://localhost:5000/api/health) |
+| Backend Metrics | [http://localhost:5000/api/metrics](http://localhost:5000/api/metrics) |
 | Prometheus UI | [http://localhost:9090](http://localhost:9090) |
+| Alertmanager UI | [http://localhost:9093](http://localhost:9093) |
 | Grafana Dashboard | [http://localhost:3001](http://localhost:3001) |
 | Nginx Metrics (raw) | [http://localhost:9113/metrics](http://localhost:9113/metrics) |
 | Loki API | [http://localhost:3100](http://localhost:3100) |
@@ -488,38 +734,32 @@ docker stats --no-stream
 
 ## Image Size & Optimization
 
-### Why `nginx:alpine` Keeps the Image Small
+### Frontend Image — nginx:1.27-alpine
 
 | Image Variant | Compressed Size | Uncompressed Size |
 |---------------|-----------------|-------------------|
 | `nginx:latest` (Debian) | ~60 MB | ~140 MB |
-| `nginx:alpine` | ~15 MB | ~40 MB |
+| `nginx:1.27-alpine` | ~15 MB | ~40 MB |
 
-The Alpine variant is **~70% smaller** than the Debian-based default. This matters for several reasons:
+The Alpine variant is **~70% smaller** than the Debian-based default. The final Consistium image adds only static files (< 100 KB) on top of the base image.
 
-1. **Faster CI/CD pipelines**: Smaller images transfer faster between registries and build agents. A 40 MB image pulls in seconds even on modest connections.
-2. **Reduced storage costs**: Container registries charge by storage. Multiplied across versions and environments (dev, staging, production), the savings compound.
-3. **Faster cold starts**: In orchestrators like Kubernetes, a pod scheduled on a node that does not have the image cached must pull it first. A 40 MB pull completes in ~2 seconds on a 100 Mbps link; a 140 MB pull takes ~11 seconds.
-4. **Smaller attack surface**: Alpine ships with ~15 packages vs. ~100+ in Debian. Fewer packages mean fewer potential CVEs and a smaller blast radius if the container is compromised.
+### Backend Image — node:20-alpine
 
-### What Makes Consistium's Image Especially Small
+| Image Variant | Compressed Size | Uncompressed Size |
+|---------------|-----------------|-------------------|
+| `node:20` (Debian) | ~350 MB | ~1 GB |
+| `node:20-alpine` | ~50 MB | ~130 MB |
 
-The final Consistium image adds only **three files** to the base nginx:alpine layer:
+The Alpine variant is **~85% smaller**. The multi-stage build further reduces the final image by excluding devDependencies (Jest, Nodemon, Supertest) and build tools.
 
-| File | Typical Size |
-|------|-------------|
-| `index.html` | ~2–5 KB |
-| `style.css` | ~3–8 KB |
-| `app.js` | ~5–15 KB |
-| `nginx.conf` | ~1 KB |
+### Optimization Techniques Used
 
-The total application layer is under **30 KB**, making the final image essentially the same size as the base `nginx:alpine` image (~40 MB). There are no `node_modules`, no build tools, and no runtime dependencies — just static files served by a compiled C binary.
-
-### Further Optimization Opportunities
-
-| Technique | Benefit | Trade-off |
-|-----------|---------|-----------|
-| **Multi-stage builds** | Not needed — there is no build step. If a bundler (Webpack, Vite) is added later, a multi-stage build would keep build tools out of the final image. | Additional Dockerfile complexity. |
-| **`.dockerignore`** | Prevents `docker-compose.yml`, `.git/`, `docs/`, and other non-essential files from entering the build context, speeding up `docker build`. | Must be maintained alongside the project. |
-| **Distroless / scratch** | Would reduce the image to ~10–15 MB by eliminating the shell entirely. | No shell means no `wget` for health checks, no `sh` for debugging. Alpine is the practical sweet spot. |
-| **Image pinning with SHA** | e.g., `FROM nginx:alpine@sha256:abc123...` locks the exact base image, preventing supply-chain drift. | Must be updated manually when patching. |
+| Technique | Applied To | Benefit |
+|-----------|-----------|---------|
+| **Multi-stage builds** | Frontend + Backend | Build tools and validation logic excluded from production images |
+| **Production-only deps** | Backend (`npm ci --omit=dev`) | Excludes Jest, Nodemon, Supertest from the final image |
+| **Alpine base images** | Both | 70–85% smaller than Debian equivalents |
+| **`.dockerignore`** | Both | Prevents `.git/`, `docs/`, `node_modules/` from entering build context |
+| **Pinned versions** | Both (`nginx:1.27-alpine`, `node:20-alpine`) | Prevents supply-chain drift from `latest` tag mutations |
+| **OCI Labels** | Both | Standard metadata for registry compliance |
+| **Non-root execution** | Both | Reduced privilege for security |
