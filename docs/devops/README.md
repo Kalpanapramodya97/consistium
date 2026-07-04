@@ -36,7 +36,7 @@ This directory contains comprehensive documentation for the DevOps and DevSecOps
 
 | Component | Technology | Version |
 |-----------|------------|---------|
-| Frontend Container | nginx:1.27-alpine (multi-stage) | 1.27 |
+| Frontend Container | nginx:1.28-alpine (multi-stage) | 1.28 |
 | Backend Container | node:20-alpine (multi-stage) | 20 |
 | Container Orchestration (Local) | Docker Compose | v2 |
 | Kubernetes | Helm Chart | v1.0.0 |
@@ -69,10 +69,13 @@ This directory contains comprehensive documentation for the DevOps and DevSecOps
 | Secret Scanning | TruffleHog | latest |
 | Vulnerability Scanning | Aqua Trivy | latest |
 | DAST | OWASP ZAP | zaproxy/action-baseline@v0.14.0 |
+| **SBOM Generation** | **Anchore Syft** | **v1.4.1** |
 | HTML Linting | HTMLHint | latest |
 | Dockerfile Linting | Hadolint | v3.1.0 |
 | Versioning | Semantic Versioning (auto) | — |
 | FinOps | Infracost | v3 |
+| **API Rate Limiting** | **express-rate-limit** | **7.4.0** |
+| **NoSQL Sanitization** | **express-mongo-sanitize** | **2.2.0** |
 
 ### Monitoring & Observability
 
@@ -111,10 +114,11 @@ graph TB
         C --> C4["Security Scans"]
         C --> C5["Infracost"]
         C --> C6["DAST (ZAP)"]
-        C1 & C2 & C3 & C4 & C5 & C6 --> D["Phase 2: Build & Scan"]
-        D --> D1["Docker Build + Trivy Image Scan"]
-        D1 --> E["Phase 3: Release & Report"]
-        E --> E1["Semantic Versioning"]
+        C1 & C2 & C3 & C4 & C5 & C6 --> D["Phase 2: Build, Scan & SBOM"]
+        D --> D1["Docker Build + Trivy + Syft SBOM"]
+        D --> D2["Filesystem SBOM (parallel)"]
+        D1 & D2 --> E["Phase 3: Release & Report"]
+        E --> E1["Semantic Versioning + SBOM attached"]
         E --> E2["Security Report"]
     end
 

@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 const { protect } = require('../middleware/auth');
+const { authLimiter, apiLimiter } = require('../middleware/rateLimiter');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -15,16 +16,18 @@ const generateToken = (id) => {
 // @route   POST /api/auth/register
 // @desc    Register a new user
 // @access  Public
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, password } = req.body;
+    // Coerce email to string — prevents NoSQL operator injection (e.g. { $gt: '' })
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : null;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Please add all fields' });
     }
 
     // Check if user exists
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ email: String(email) });
 
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
@@ -65,12 +68,17 @@ router.post('/register', async (req, res) => {
 // @route   POST /api/auth/login
 // @desc    Authenticate a user
 // @access  Public
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    // Coerce email to string — prevents NoSQL operator injection
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : null;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
 
     // Check for user email
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: String(email) });
 
     if (user && (await bcrypt.compare(password, user.password))) {
       res.json({
@@ -91,7 +99,7 @@ router.post('/login', async (req, res) => {
 // @route   GET /api/auth/me
 // @desc    Get user data
 // @access  Private
-router.get('/me', protect, async (req, res) => {
+router.get('/me', apiLimiter, protect, async (req, res) => {
   res.json({
     id: req.user.id,
     name: req.user.name,

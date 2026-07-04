@@ -1507,10 +1507,19 @@
     function addMessage(content, isUser = false) {
       const msg = document.createElement('div');
       msg.className = `ai-msg${isUser ? ' user-msg' : ''}`;
-      msg.innerHTML = `
-        <div class="ai-msg-avatar">${isUser ? '👤' : '🧠'}</div>
-        <div class="ai-msg-bubble">${content}</div>
-      `;
+
+      // Build avatar — textContent is safe for emoji literals
+      const avatar = document.createElement('div');
+      avatar.className = 'ai-msg-avatar';
+      avatar.textContent = isUser ? '\u{1F464}' : '\u{1F9E0}';
+
+      // Build bubble — textContent ensures user input is NEVER interpreted as HTML
+      const bubble = document.createElement('div');
+      bubble.className = 'ai-msg-bubble';
+      bubble.textContent = content;   // XSS-safe: no innerHTML with user data
+
+      msg.appendChild(avatar);
+      msg.appendChild(bubble);
       messagesEl.appendChild(msg);
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }

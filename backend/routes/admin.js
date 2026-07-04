@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { User, Habit, Completion } = require('../models');
 const { protect, admin } = require('../middleware/auth');
+const { adminLimiter } = require('../middleware/rateLimiter');
 
 // Apply middleware to all routes
+router.use(adminLimiter);
 router.use(protect);
 router.use(admin);
 

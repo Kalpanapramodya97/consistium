@@ -9,7 +9,7 @@
 # Validates that all required static files exist and are
 # non-empty before proceeding to the production image.
 # This catches missing files at build time, not at runtime.
-FROM alpine:3.21 AS validator
+FROM alpine:3.22 AS validator
 
 WORKDIR /assets
 
@@ -30,7 +30,12 @@ RUN set -e && \
     echo "── All assets validated ──"
 
 # ── Stage 2: Production Image ────────────────────────────────
-FROM nginx:1.27-alpine AS production
+FROM nginx:1.28-alpine AS production
+
+# Upgrade all OS packages to latest patched versions.
+# This resolves Trivy CRITICAL/HIGH CVEs in libcrypto3, libssl3, libexpat,
+# libpng, libxml2, musl, musl-utils, and zlib inherited from the base image.
+RUN apk upgrade --no-cache
 
 # OCI Image Labels (standard metadata for registries & scanners)
 LABEL org.opencontainers.image.title="Consistium" \

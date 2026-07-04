@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { Habit, Completion } = require('../models');
 const { protect } = require('../middleware/auth');
+const { apiLimiter } = require('../middleware/rateLimiter');
 
 // Apply middleware to all routes
+router.use(apiLimiter);
 router.use(protect);
 
 // @route   GET /api/habits
@@ -63,10 +65,27 @@ router.put('/:id', async (req, res) => {
       return res.status(401).json({ message: 'User not authorized' });
     }
 
+    // Whitelist allowed fields — do NOT pass req.body directly to prevent
+    // NoSQL operator injection (e.g. { $set: { role: 'admin' } })
+    const allowedUpdates = {
+      name: req.body.name,
+      emoji: req.body.emoji,
+      type: req.body.type,
+      isNewHabit: req.body.isNewHabit,
+      repeatPattern: req.body.repeatPattern,
+      selectedDays: req.body.selectedDays,
+      intervalDays: req.body.intervalDays,
+      startDate: req.body.startDate,
+    };
+    // Remove undefined keys so existing values are preserved
+    Object.keys(allowedUpdates).forEach(
+      (k) => allowedUpdates[k] === undefined && delete allowedUpdates[k]
+    );
+
     const updatedHabit = await Habit.findByIdAndUpdate(
       req.params.id,
-      req.body,
-      { new: true }
+      { $set: allowedUpdates },
+      { new: true, runValidators: true }
     );
 
     res.json(updatedHabit);

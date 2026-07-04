@@ -160,18 +160,20 @@ Consistium goes beyond just being a frontend app—it serves as a **reference ar
 | Layer | Technologies |
 |:---|:---|
 | **Frontend** | HTML5, CSS3 (Glassmorphism), Vanilla JavaScript, Admin Dashboard |
-| **Containerization** | Docker, multi-stage Alpine Nginx builds |
+| **Containerization** | Docker, multi-stage Alpine Nginx builds (nginx:1.28-alpine) |
 | **Orchestration** | Kubernetes, Helm v3 |
 | **Infrastructure** | Terraform (VPC, EKS, DocumentDB), modular IaC, multi-env |
 | **Observability** | Prometheus, Grafana, Loki (LogQL), Alertmanager |
 | **FinOps** | Infracost (Cloud Cost Estimation) |
 | **Security (CI/CD)** | GitHub Actions, TruffleHog (Secrets), CodeQL (SAST), Trivy (CVEs), OWASP ZAP (DAST), Ansible |
+| **SBOM** | Anchore Syft — CycloneDX JSON + SPDX JSON attached to every GitHub Release |
+| **API Security** | express-rate-limit (brute-force protection), express-mongo-sanitize (NoSQL injection), XSS-safe DOM construction |
 
 <p align="center">
   <img src="https://img.shields.io/badge/Security-A+ Grade-success?style=for-the-badge&logo=security" alt="Security Grade" />
 </p>
 
-The project features a **unified CI/CD and DevSecOps pipeline** that runs **SAST**, **DAST** (OWASP ZAP), **Secret Scanning**, and **Container Vulnerability Scanning**, along with **FinOps Cloud Cost Estimation** via Infracost. It aggregates all security findings and AWS cost estimates into a beautiful branded HTML report and delivers it via email after every commit. Only if all security and quality checks pass will the application be released and pushed to the container registry. The project also uses **Ansible** for local security report generation.
+The project features a **unified CI/CD and DevSecOps pipeline** that runs **SAST**, **DAST** (OWASP ZAP), **Secret Scanning**, **Container Vulnerability Scanning**, and **SBOM generation** (Anchore Syft — CycloneDX + SPDX), along with **FinOps Cloud Cost Estimation** via Infracost. All security findings and AWS cost estimates are aggregated into a branded HTML report and delivered via email after every commit. Only if all security and quality checks pass will the application be released and pushed to the container registry. Every GitHub Release automatically includes 4 SBOM files as downloadable assets. The API is hardened with rate limiting, NoSQL injection sanitization, and XSS-safe DOM rendering.
 
 ---
 

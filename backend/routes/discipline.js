@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { Habit, Completion } = require('../models');
 const { protect } = require('../middleware/auth');
+const { apiLimiter } = require('../middleware/rateLimiter');
 
 // Apply middleware to all routes
+router.use(apiLimiter);
 router.use(protect);
 
 // Discipline Levels definition

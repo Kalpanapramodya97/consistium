@@ -331,6 +331,26 @@ jobs:
           path: trivy-image-results.json
           retention-days: 7
 
+      # ── SBOM: Generate Software Bill of Materials from Docker image ─────────
+      - name: Install Syft (SBOM Generator)
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin v1.4.1
+
+      - name: Generate SBOM — CycloneDX JSON (Docker image)
+        run: syft habit-tracker:${{ github.sha }} -o cyclonedx-json=sbom-image-cyclonedx.json
+
+      - name: Generate SBOM — SPDX JSON (Docker image)
+        run: syft habit-tracker:${{ github.sha }} -o spdx-json=sbom-image-spdx.json
+
+      - name: Upload Docker Image SBOM artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-docker-image
+          path: |
+            sbom-image-cyclonedx.json
+            sbom-image-spdx.json
+          retention-days: 90
+
       - name: Log in to GitHub Container Registry
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
@@ -352,13 +372,50 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: false
 
+  # ── SBOM: Filesystem & npm Dependency Scan (runs in parallel) ───────────────
+  sbom-filesystem:
+    name: SBOM - Filesystem & Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './backend/package-lock.json'
+
+      - name: Install Backend Dependencies (for accurate npm SBOM)
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Install Syft (SBOM Generator)
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin v1.4.1
+
+      - name: Generate SBOM — CycloneDX JSON (filesystem)
+        run: syft dir:. -o cyclonedx-json=sbom-fs-cyclonedx.json
+
+      - name: Generate SBOM — SPDX JSON (filesystem)
+        run: syft dir:. -o spdx-json=sbom-fs-spdx.json
+
+      - name: Upload Filesystem SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-filesystem
+          path: |
+            sbom-fs-cyclonedx.json
+            sbom-fs-spdx.json
+          retention-days: 90
+
   # ==========================================
   # PHASE 3: Release & Reporting (Depends on Phase 2)
   # ==========================================
   semantic-versioning:
     name: Generate Semantic Version & Release
     runs-on: ubuntu-latest
-    needs: [docker-build-scan-push]
+    needs: [docker-build-scan-push, sbom-filesystem]
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     permissions:
       contents: write
@@ -437,13 +494,32 @@ jobs:
             RELEASE_DOCUMENT.html
           retention-days: 90
 
+      - name: Download Docker Image SBOM for Release
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-docker-image
+          path: sbom-release/
+        continue-on-error: true
+
+      - name: Download Filesystem SBOM for Release
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-filesystem
+          path: sbom-release/
+        continue-on-error: true
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
           name: Release ${{ steps.tag_version.outputs.new_tag }}
           body_path: RELEASE_DOCUMENT.md
-          files: RELEASE_DOCUMENT.md
+          files: |
+            RELEASE_DOCUMENT.md
+            sbom-release/sbom-image-cyclonedx.json
+            sbom-release/sbom-image-spdx.json
+            sbom-release/sbom-fs-cyclonedx.json
+            sbom-release/sbom-fs-spdx.json
 
       - name: Send Release Document via Email
         uses: dawidd6/action-send-mail@v3
@@ -470,7 +546,7 @@ jobs:
   security-report:
     name: Generate DevSecOps & FinOps Report
     runs-on: ubuntu-latest
-    needs: [quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, docker-build-scan-push, dast-scan]
+    needs: [quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, docker-build-scan-push, dast-scan, sbom-filesystem]
     if: always() # Generate report even if scans fail
     permissions:
       contents: read
@@ -511,6 +587,20 @@ jobs:
         with:
           name: infracost-results
           path: scan-results/
+        continue-on-error: true
+
+      - name: Download Docker Image SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-docker-image
+          path: scan-results/sbom/
+        continue-on-error: true
+
+      - name: Download Filesystem SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-filesystem
+          path: scan-results/sbom/
         continue-on-error: true
 
       - name: Install jq
