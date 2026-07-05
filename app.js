@@ -1513,10 +1513,16 @@
       avatar.className = 'ai-msg-avatar';
       avatar.textContent = isUser ? '\u{1F464}' : '\u{1F9E0}';
 
-      // Build bubble — textContent ensures user input is NEVER interpreted as HTML
+      // Build bubble
       const bubble = document.createElement('div');
       bubble.className = 'ai-msg-bubble';
-      bubble.textContent = content;   // XSS-safe: no innerHTML with user data
+      if (isUser) {
+        // XSS-safe: no innerHTML with user data
+        bubble.textContent = content;
+      } else {
+        // AI responses contain formatted HTML
+        bubble.innerHTML = content;
+      }
 
       msg.appendChild(avatar);
       msg.appendChild(bubble);
