@@ -82,7 +82,18 @@ open index.html  # Windows: start index.html
 
 ### 🐳 Option 2: Docker Compose (Local Build)
 Run with Docker Compose for a production-ready Nginx setup, Node.js Backend, MongoDB database, and a full observability stack.
+
+**💡 Tip: Use the provided Helper Scripts!**
+To make running commands easier, this project includes a `Makefile` (for Linux/macOS) and a `manage.ps1` (for Windows PowerShell).
+
 ```bash
+# Windows (PowerShell)
+.\manage.ps1 up
+
+# Linux / macOS
+make up
+
+# Or standard Docker
 docker compose up -d
 ```
 
