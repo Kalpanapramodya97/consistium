@@ -561,9 +561,9 @@ jobs:
     name: Generate DevSecOps & FinOps Report
     runs-on: ubuntu-latest
     needs: [quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, docker-build-scan-push, dast-scan, sbom-filesystem]
-    if: always() # Generate report even if scans fail
-    environment:
-      name: production
+    if: always() # Generate report even if scans fail — runs on PRs AND master
+    # NOTE: No environment gate here — this job runs on every PR run.
+    # The environment gate lives only on semantic-versioning (master-only).
     permissions:
       contents: read
     steps:

@@ -1,0 +1,72 @@
+name: Feature Branch — Auto Pull Request
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - master
+
+jobs:
+  auto-pr:
+    name: Open PR to main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create Pull Request (if not already open)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          BASE="master"
+
+          # Check if a PR already exists for this branch
+          EXISTING=$(gh pr list --head "$BRANCH" --base "$BASE" --state open --json number --jq '.[0].number')
+
+          if [ -n "$EXISTING" ]; then
+            echo "PR #$EXISTING already exists for branch '$BRANCH' - skipping."
+            exit 0
+          fi
+
+          # Build a clean title from branch name
+          # e.g. "feat/add-logging" becomes "feat: add logging"
+          TITLE=$(echo "$BRANCH" \
+            | sed 's|.*/||' \
+            | sed 's/[-_]/ /g' \
+            | sed 's/\b\(feat\|fix\|chore\|docs\|ci\|refactor\|test\)\b/\1:/g')
+
+          # Write PR body to a temp file to avoid YAML parsing issues
+          cat > /tmp/pr-body.md << 'PREOF'
+          ## Summary
+          Describe what this PR does.
+
+          ## Changes
+          List the main changes.
+
+          ## Checklist
+          - [ ] Code quality checks pass
+          - [ ] Unit tests pass
+          - [ ] Security scans reviewed
+          - [ ] No secrets committed
+          PREOF
+
+          # Ensure the 'auto-pr' label exists in the repo (creates it if missing)
+          gh label create "auto-pr" \
+            --color "#0075ca" \
+            --description "Pull request auto-created by CI on branch push" \
+            2>/dev/null || true
+
+          gh pr create \
+            --head "$BRANCH" \
+            --base "$BASE" \
+            --title "$TITLE" \
+            --body-file /tmp/pr-body.md \
+            --label "auto-pr" \
+            --assignee "${{ github.actor }}"
+
+          echo "Pull request created: $BRANCH -> $BASE"
