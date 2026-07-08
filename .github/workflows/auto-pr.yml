@@ -55,6 +55,12 @@ jobs:
           - [ ] No secrets committed
           PREOF
 
+          # Ensure the 'auto-pr' label exists in the repo (creates it if missing)
+          gh label create "auto-pr" \
+            --color "#0075ca" \
+            --description "Pull request auto-created by CI on branch push" \
+            2>/dev/null || true
+
           gh pr create \
             --head "$BRANCH" \
             --base "$BASE" \
