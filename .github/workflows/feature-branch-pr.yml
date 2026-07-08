@@ -1,4 +1,4 @@
-name: Auto-Create Pull Request
+name: Feature Branch — Auto Pull Request
 
 on:
   push:
