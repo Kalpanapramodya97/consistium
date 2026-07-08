@@ -10,6 +10,7 @@ This directory contains comprehensive documentation for the DevOps and DevSecOps
 |----------|-------------|
 | [System Architecture](architecture.md) | High-level system design, component overview, and technology matrix |
 | [Unified CI/CD & DevSecOps Pipeline](unified-pipeline.md) | Automated build, test, security scanning, and release pipeline with GitHub Actions |
+| [Branch Protection & Environment Gates](branch-protection-env-gates.md) | GitHub-native approval gate before releases + branch protection rules |
 | [Docker & Container Setup](docker-setup.md) | Containerization strategy, multi-stage builds, Docker Compose orchestration |
 | [Monitoring & Observability](monitoring.md) | Prometheus, Grafana, Alertmanager, Loki, and backend metrics |
 | [Kubernetes Deployment](kubernetes.md) | Helm chart, multi-environment configs, security hardening, and autoscaling |
