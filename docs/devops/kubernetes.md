@@ -7,8 +7,8 @@ Consistium can be deployed to any Kubernetes cluster using the included Helm cha
 | Tool | Minimum Version | Purpose |
 |---|---|---|
 | [Helm](https://helm.sh/docs/intro/install/) | v3.12+ | Kubernetes package manager |
-| [kubectl](https://kubernetes.io/docs/tasks/tools/) | v1.27+ | Kubernetes CLI |
-| Kubernetes cluster | v1.27+ | Target environment (EKS, GKE, AKS, minikube, kind) |
+| [kubectl](https://kubernetes.io/docs/tasks/tools/) | v1.28+ | Kubernetes CLI |
+| Kubernetes cluster | v1.28+ | Target environment (EKS, GKE, AKS, minikube, kind) |
 
 ### Optional Components
 

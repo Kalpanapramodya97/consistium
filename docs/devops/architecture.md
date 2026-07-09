@@ -17,7 +17,7 @@ graph TB
     subgraph DockerCompose["Docker Compose Stack (Local Development)"]
         direction TB
         subgraph AppLayer["Application Layer"]
-            Consistium["consistium<br/>nginx:1.27-alpine<br/>:3000 → :80<br/>32M RAM / 0.25 CPU"]
+            Consistium["consistium<br/>nginx:1.28-alpine<br/>:3000 → :80<br/>32M RAM / 0.25 CPU"]
             Backend["backend<br/>node:20-alpine<br/>:5000<br/>Express + JWT"]
             MongoDB["mongodb<br/>mongo:6<br/>:27017"]
         end
@@ -128,7 +128,7 @@ The backend is a **Node.js/Express** REST API that provides:
 
 ### Nginx Configuration
 
-The `consistium` container runs a pinned `nginx:1.27-alpine` image (not `latest`), chosen for its minimal footprint. Key configuration details include:
+The `consistium` container runs a pinned `nginx:1.28-alpine` image (not `latest`), chosen for its minimal footprint. Key configuration details include:
 
 - **Port mapping**: Host port `3000` maps to container port `80`, keeping the host's standard HTTP port available for other services.
 - **Healthcheck**: A built-in Docker healthcheck periodically verifies the container is responsive, enabling automatic restart on failure.
@@ -145,8 +145,8 @@ The project follows a security-conscious containerization strategy with **multi-
 
 | Stage | Base Image | Purpose |
 |---|---|---|
-| **Stage 1: Validator** | `alpine:3.21` | Validates all required static assets exist and are non-empty before building the production image |
-| **Stage 2: Production** | `nginx:1.27-alpine` | Production-grade Nginx with security hardening (non-root, OCI labels, minimal packages) |
+| **Stage 1: Validator** | `alpine:3.22` | Validates all required static assets exist and are non-empty before building the production image |
+| **Stage 2: Production** | `nginx:1.28-alpine` | Production-grade Nginx with security hardening (non-root, OCI labels, minimal packages) |
 
 #### Security Hardening
 
@@ -463,7 +463,7 @@ graph LR
 
 | Technology | Version | Category | Purpose |
 |---|---|---|---|
-| **Nginx** | 1.27-alpine | Web Server | Serves static HTML/CSS/JS and proxies API requests |
+| **Nginx** | 1.28-alpine | Web Server | Serves static HTML/CSS/JS and proxies API requests |
 | **Node.js** | 20-alpine | Runtime | Backend API server |
 | **Express** | 4.19.2 | Framework | RESTful API framework |
 | **MongoDB** | 6 | Database | Document database (local development) |
@@ -502,7 +502,7 @@ graph LR
 | **Supertest** | 7.2.2 | Testing | HTTP assertion library for API testing |
 | **dumb-init** | latest | Container | PID 1 signal forwarding for graceful shutdown |
 | **Helm** | v3.12+ | Orchestration | Kubernetes package management with templated manifests |
-| **Kubernetes** | v1.27+ | Orchestration | Container orchestration with Deployment, HPA, PDB, NetworkPolicy |
+| **Kubernetes** | v1.28+ | Orchestration | Container orchestration with Deployment, HPA, PDB, NetworkPolicy |
 | **Security Report Generator** | Custom | Security | Aggregates scan + FinOps results into branded HTML report |
 | **action-send-mail** | v3 | Notification | Delivers security reports and release documents via Gmail SMTP |
 | **Semantic Versioning** | — | Release | Automated version tagging and GitHub Release creation |
