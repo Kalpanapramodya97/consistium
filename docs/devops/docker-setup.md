@@ -12,7 +12,7 @@ The frontend uses a two-stage build process: validation followed by production i
 
 ```dockerfile
 # ── Stage 1: Asset Validation ────────────────────────────────
-FROM alpine:3.21 AS validator
+FROM alpine:3.22 AS validator
 
 WORKDIR /assets
 
@@ -31,7 +31,7 @@ RUN set -e && \
     echo "── All assets validated ──"
 
 # ── Stage 2: Production Image ────────────────────────────────
-FROM nginx:1.27-alpine AS production
+FROM nginx:1.28-alpine AS production
 
 LABEL org.opencontainers.image.title="Consistium" \
       org.opencontainers.image.description="Consistium Habit Tracker" \
@@ -72,8 +72,8 @@ CMD ["nginx", "-g", "daemon off;"]
 
 | Stage | Base Image | Purpose |
 |-------|-----------|---------|
-| **Stage 1: Validator** | `alpine:3.21` | Copies all static files and validates that each required file exists and is non-empty. Catches missing assets at **build time** rather than runtime, preventing broken deployments. |
-| **Stage 2: Production** | `nginx:1.27-alpine` | The production image — uses a **pinned** Nginx version (not `latest`), removes default content, creates temp directories for non-root Nginx, sets ownership to UID 101 (nginx user), and runs as non-root. |
+| **Stage 1: Validator** | `alpine:3.22` | Copies all static files and validates that each required file exists and is non-empty. Catches missing assets at **build time** rather than runtime, preventing broken deployments. |
+| **Stage 2: Production** | `nginx:1.28-alpine` | The production image — uses a **pinned** Nginx version (not `latest`), removes default content, creates temp directories for non-root Nginx, sets ownership to UID 101 (nginx user), and runs as non-root. |
 
 ### Security Hardening
 
@@ -734,12 +734,12 @@ docker stats --no-stream
 
 ## Image Size & Optimization
 
-### Frontend Image — nginx:1.27-alpine
+### Frontend Image — nginx:1.28-alpine
 
 | Image Variant | Compressed Size | Uncompressed Size |
 |---------------|-----------------|-------------------|
 | `nginx:latest` (Debian) | ~60 MB | ~140 MB |
-| `nginx:1.27-alpine` | ~15 MB | ~40 MB |
+| `nginx:1.28-alpine` | ~15 MB | ~40 MB |
 
 The Alpine variant is **~70% smaller** than the Debian-based default. The final Consistium image adds only static files (< 100 KB) on top of the base image.
 
@@ -760,6 +760,6 @@ The Alpine variant is **~85% smaller**. The multi-stage build further reduces th
 | **Production-only deps** | Backend (`npm ci --omit=dev`) | Excludes Jest, Nodemon, Supertest from the final image |
 | **Alpine base images** | Both | 70–85% smaller than Debian equivalents |
 | **`.dockerignore`** | Both | Prevents `.git/`, `docs/`, `node_modules/` from entering build context |
-| **Pinned versions** | Both (`nginx:1.27-alpine`, `node:20-alpine`) | Prevents supply-chain drift from `latest` tag mutations |
+| **Pinned versions** | Both (`nginx:1.28-alpine`, `node:20-alpine`) | Prevents supply-chain drift from `latest` tag mutations |
 | **OCI Labels** | Both | Standard metadata for registry compliance |
 | **Non-root execution** | Both | Reduced privilege for security |
