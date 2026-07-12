@@ -160,7 +160,27 @@
     disciplineLongestStreak: $('#disciplineLongestStreak'),
     disciplineTotalDays: $('#disciplineTotalDays'),
     disciplineProgressText: $('#disciplineProgressText'),
-    disciplineProgressFill: $('#disciplineProgressFill')
+    disciplineProgressFill: $('#disciplineProgressFill'),
+    // Identity
+    identitySection: $('#identitySection'),
+    identityCards: $('#identityCards'),
+    identityEmpty: $('#identityEmpty'),
+    addIdentityBtn: $('#addIdentityBtn'),
+    identityModal: $('#identityModal'),
+    identityModalTitle: $('#identityModalTitle'),
+    identityCloseBtn: $('#identityCloseBtn'),
+    identityForm: $('#identityForm'),
+    identityEmojiPicker: $('#identityEmojiPicker'),
+    identityEmoji: $('#identityEmoji'),
+    identityStatement: $('#identityStatement'),
+    identityHabitLinker: $('#identityHabitLinker'),
+    identityHabitEmpty: $('#identityHabitEmpty'),
+    identityEditId: $('#identityEditId'),
+    saveIdentityBtn: $('#saveIdentityBtn'),
+    deleteIdentityBtn: $('#deleteIdentityBtn'),
+    habitIdentityGroup: $('#habitIdentityGroup'),
+    habitIdentityTags: $('#habitIdentityTags'),
+    habitIdentityEmpty: $('#habitIdentityEmpty')
   };
 
   // ── Helpers ──
@@ -446,6 +466,8 @@
             points: 1,
             ...h
           }));
+          // Migrate: add identities array
+          parsed.identities = parsed.identities || [];
           return parsed;
         }
       }
@@ -453,7 +475,8 @@
     return {
       habits: DEFAULT_HABITS,
       completions: {},
-      tasks: {}
+      tasks: {},
+      identities: []
     };
   }
 
@@ -479,6 +502,25 @@
     grad.appendChild(stop2);
     defs.appendChild(grad);
     svg.insertBefore(defs, svg.firstChild);
+
+    // Identity ring gradient
+    const defs2 = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    const grad2 = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+    grad2.setAttribute('id', 'identityGradient');
+    grad2.setAttribute('x1', '0%'); grad2.setAttribute('y1', '0%');
+    grad2.setAttribute('x2', '100%'); grad2.setAttribute('y2', '100%');
+    const iStop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    iStop1.setAttribute('offset', '0%'); iStop1.setAttribute('stop-color', '#8b5cf6');
+    const iStop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    iStop2.setAttribute('offset', '100%'); iStop2.setAttribute('stop-color', '#06b6d4');
+    grad2.appendChild(iStop1);
+    grad2.appendChild(iStop2);
+    defs2.appendChild(grad2);
+    // Add to body so it can be referenced anywhere
+    const hiddenSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    hiddenSvg.style.width = '0'; hiddenSvg.style.height = '0'; hiddenSvg.style.position = 'absolute';
+    hiddenSvg.appendChild(defs2);
+    document.body.appendChild(hiddenSvg);
   }
 
   // ── Render Functions ──
@@ -687,6 +729,157 @@
     dom.specialTasksHeader.style.display = tasks.length ? 'flex' : 'none';
   }
 
+  // ── Identity Dashboard ──
+  const IDENTITY_LEVELS = [
+    { name: 'Seedling', class: 'level-seedling', minVotes: 0 },
+    { name: 'Growing', class: 'level-growing', minVotes: 10 },
+    { name: 'Strong', class: 'level-strong', minVotes: 30 },
+    { name: 'Rooted', class: 'level-rooted', minVotes: 60 },
+    { name: 'Unshakeable', class: 'level-unshakeable', minVotes: 100 }
+  ];
+
+  function calculateIdentityVotes(identity) {
+    let totalVotes = 0;
+    const habitIds = identity.habitIds || [];
+    
+    // Scan all days in history
+    const allDates = new Set();
+    Object.keys(state.completions).forEach(k => allDates.add(k));
+    
+    // Also add dates since habit start dates if they are bad habits
+    habitIds.forEach(id => {
+      const h = state.habits.find(hx => hx.id === id);
+      if (h && h.type === 'bad' && h.startDate) {
+        let cur = new Date(h.startDate);
+        resetToMidnight(cur);
+        const today = new Date();
+        resetToMidnight(today);
+        while(cur <= today) {
+          allDates.add(dateKey(cur));
+          cur.setDate(cur.getDate() + 1);
+        }
+      }
+    });
+
+    Array.from(allDates).forEach(dKey => {
+      const dateObj = new Date(dKey);
+      resetToMidnight(dateObj);
+      const comps = state.completions[dKey] || {};
+      
+      habitIds.forEach(hId => {
+        const habit = state.habits.find(h => h.id === hId);
+        if (!habit) return;
+        if (!shouldHabitAppearOnDate(habit, dateObj)) return;
+        
+        if (habit.type === 'bad') {
+          // For bad habits: NOT doing it = a vote
+          if (!comps[hId]) totalVotes++;
+        } else {
+          // Good habit / Task: Doing it = a vote
+          if (comps[hId]) totalVotes++;
+        }
+      });
+    });
+    return totalVotes;
+  }
+
+  function getIdentityLevel(votes) {
+    let lvl = IDENTITY_LEVELS[0];
+    let nextLvl = IDENTITY_LEVELS[1];
+    for (let i = 0; i < IDENTITY_LEVELS.length; i++) {
+      if (votes >= IDENTITY_LEVELS[i].minVotes) {
+        lvl = IDENTITY_LEVELS[i];
+        nextLvl = i + 1 < IDENTITY_LEVELS.length ? IDENTITY_LEVELS[i + 1] : null;
+      }
+    }
+    return { current: lvl, next: nextLvl };
+  }
+
+  function renderIdentityDashboard() {
+    dom.identityCards.innerHTML = '';
+    const identities = state.identities || [];
+    
+    if (identities.length === 0) {
+      dom.identityEmpty.style.display = 'block';
+      return;
+    }
+    
+    dom.identityEmpty.style.display = 'none';
+    
+    identities.forEach((idty, index) => {
+      const votes = calculateIdentityVotes(idty);
+      const levelInfo = getIdentityLevel(votes);
+      
+      let nextLevelHtml = '';
+      let progressHtml = '';
+      let pct = 100;
+      
+      if (levelInfo.next) {
+        const votesNeeded = levelInfo.next.minVotes - levelInfo.current.minVotes;
+        const votesEarned = votes - levelInfo.current.minVotes;
+        const remaining = levelInfo.next.minVotes - votes;
+        pct = Math.round((votesEarned / votesNeeded) * 100);
+        
+        nextLevelHtml = `<div class="identity-next-level">${remaining} more to ${levelInfo.next.name}</div>`;
+        progressHtml = `
+          <div class="identity-progress-bar">
+            <div class="identity-progress-fill" style="width: ${pct}%"></div>
+          </div>
+        `;
+      } else {
+        nextLevelHtml = `<div class="identity-next-level">Max level reached!</div>`;
+        progressHtml = `
+          <div class="identity-progress-bar">
+            <div class="identity-progress-fill" style="width: 100%"></div>
+          </div>
+        `;
+      }
+      
+      const circumference = 2 * Math.PI * 26; // r=26
+      const offset = circumference - (pct / 100) * circumference;
+      
+      const linkedHabitsHtml = (idty.habitIds || []).map(hId => {
+        const h = state.habits.find(hx => hx.id === hId);
+        if (!h) return '';
+        return `<span class="identity-habit-pill"><span class="identity-habit-pill-emoji">${h.emoji}</span> ${h.name}</span>`;
+      }).join('');
+      
+      const card = document.createElement('div');
+      card.className = 'identity-card';
+      card.style.animationDelay = `${index * 0.1}s`;
+      card.innerHTML = `
+        <div class="identity-ring-container">
+          <svg class="identity-ring" viewBox="0 0 64 64">
+            <circle class="identity-ring-bg" cx="32" cy="32" r="26" />
+            <circle class="identity-ring-fill" cx="32" cy="32" r="26" style="stroke-dasharray: ${circumference}; stroke-dashoffset: ${offset};" />
+          </svg>
+          <div class="identity-ring-emoji">${idty.emoji}</div>
+        </div>
+        <div class="identity-info">
+          <div class="identity-statement">
+            I am a ${idty.statement}
+            <span class="identity-level-badge ${levelInfo.current.class}">${levelInfo.current.name}</span>
+          </div>
+          <div class="identity-meta">
+            <div class="identity-votes"><span class="identity-vote-count">${votes}</span> votes</div>
+            ${nextLevelHtml}
+          </div>
+          ${progressHtml}
+          ${linkedHabitsHtml ? `<div class="identity-habits">${linkedHabitsHtml}</div>` : ''}
+        </div>
+        <button class="identity-edit-btn" data-id="${idty.id}" title="Edit Identity">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+      `;
+      
+      card.querySelector('.identity-edit-btn').addEventListener('click', () => {
+        openEditIdentityModal(idty);
+      });
+      
+      dom.identityCards.appendChild(card);
+    });
+  }
+
   function renderWeeklyHeatmap() {
     dom.weeklyHeatmap.innerHTML = '';
     const today = new Date();
@@ -761,6 +954,7 @@
     renderWeeklyHeatmap();
     renderQuote();
     fetchAndRenderDisciplineStats();
+    renderIdentityDashboard();
   }
 
   // ── Actions ──
@@ -854,6 +1048,11 @@
     dom.diffOpts.forEach(b => b.classList.toggle('selected', b.dataset.points === '1'));
 
     setModalType('good');
+    
+    // Load Identity tags
+    dom.habitIdentityGroup.style.display = 'block';
+    renderIdentityTagSelector([]);
+    
     dom.habitModal.style.display = 'flex';
     dom.habitName.focus();
   }
@@ -883,6 +1082,13 @@
     const pts = String(habit.points || 1);
     dom.habitPoints.value = pts;
     dom.diffOpts.forEach(b => b.classList.toggle('selected', b.dataset.points === pts));
+
+    // Load Identity tags
+    dom.habitIdentityGroup.style.display = 'block';
+    const linkedIdentityIds = (state.identities || [])
+      .filter(idty => idty.habitIds.includes(habit.id))
+      .map(idty => idty.id);
+    renderIdentityTagSelector(linkedIdentityIds);
 
     setModalType(habit.type || 'good');
     dom.habitEmoji.value = habit.emoji;
@@ -958,8 +1164,29 @@
               habit.startDate = startDate;
             }
           } else {
-            state.habits.push({ id: genId(), emoji, name, isNew, type, points, repeatPattern, selectedDays, intervalDays, startDate });
+            const newId = genId();
+            state.habits.push({ id: newId, emoji, name, isNew, type, points, repeatPattern, selectedDays, intervalDays, startDate });
+            // For new habits, we need to pass the ID to the identity tagger
+            dom.habitEditId.value = newId; 
           }
+          
+          // Update Identity linkages
+          const targetHabitId = dom.habitEditId.value;
+          const selectedIdentityIds = Array.from(dom.habitIdentityTags.querySelectorAll('input:checked')).map(inp => inp.value);
+          
+          if (state.identities) {
+            state.identities.forEach(idty => {
+              const hasHabit = idty.habitIds.includes(targetHabitId);
+              const shouldHave = selectedIdentityIds.includes(idty.id);
+              
+              if (shouldHave && !hasHabit) {
+                idty.habitIds.push(targetHabitId);
+              } else if (!shouldHave && hasHabit) {
+                idty.habitIds = idty.habitIds.filter(id => id !== targetHabitId);
+              }
+            });
+          }
+
           saveState();
           renderAll();
         }
@@ -968,6 +1195,146 @@
         alert(e.message);
       }
     }
+  }
+
+  // ── Identity CRUD ──
+  function renderIdentityTagSelector(selectedIds = []) {
+    const identities = state.identities || [];
+    dom.habitIdentityTags.innerHTML = '';
+    
+    if (identities.length === 0) {
+      dom.habitIdentityEmpty.style.display = 'block';
+      return;
+    }
+    
+    dom.habitIdentityEmpty.style.display = 'none';
+    
+    identities.forEach(idty => {
+      const isSelected = selectedIds.includes(idty.id);
+      const lbl = document.createElement('label');
+      lbl.className = `identity-tag-opt ${isSelected ? 'selected' : ''}`;
+      lbl.innerHTML = `
+        <input type="checkbox" value="${idty.id}" ${isSelected ? 'checked' : ''}>
+        ${idty.emoji} ${idty.statement}
+      `;
+      lbl.querySelector('input').addEventListener('change', function() {
+        lbl.classList.toggle('selected', this.checked);
+      });
+      dom.habitIdentityTags.appendChild(lbl);
+    });
+  }
+
+  function renderIdentityHabitLinker(selectedHabitIds = []) {
+    dom.identityHabitLinker.innerHTML = '';
+    const habits = state.habits || [];
+    
+    if (habits.length === 0) {
+      dom.identityHabitEmpty.style.display = 'block';
+      return;
+    }
+    
+    dom.identityHabitEmpty.style.display = 'none';
+    
+    habits.forEach(h => {
+      const isSelected = selectedHabitIds.includes(h.id);
+      const label = document.createElement('label');
+      label.className = `identity-link-opt ${isSelected ? 'selected' : ''}`;
+      label.innerHTML = `
+        <input type="checkbox" value="${h.id}" ${isSelected ? 'checked' : ''} />
+        <span class="identity-link-emoji">${h.emoji}</span>
+        <span class="identity-link-name">${h.name}</span>
+      `;
+      
+      label.querySelector('input').addEventListener('change', function() {
+        label.classList.toggle('selected', this.checked);
+      });
+      
+      dom.identityHabitLinker.appendChild(label);
+    });
+  }
+
+  function openAddIdentityModal() {
+    dom.identityModalTitle.textContent = 'Add Identity';
+    dom.saveIdentityBtn.textContent = 'Add Identity';
+    dom.deleteIdentityBtn.style.display = 'none';
+    dom.identityStatement.value = '';
+    dom.identityEditId.value = '';
+    
+    $$('.identity-emoji-opt').forEach(b => b.classList.remove('selected'));
+    const def = document.querySelector('.identity-emoji-opt[data-emoji="🪞"]');
+    if (def) def.classList.add('selected');
+    dom.identityEmoji.value = '🪞';
+    
+    renderIdentityHabitLinker([]);
+    
+    dom.identityModal.style.display = 'flex';
+    dom.identityStatement.focus();
+  }
+
+  function openEditIdentityModal(identity) {
+    dom.identityModalTitle.textContent = 'Edit Identity';
+    dom.saveIdentityBtn.textContent = 'Save Changes';
+    dom.deleteIdentityBtn.style.display = 'block';
+    dom.identityStatement.value = identity.statement;
+    dom.identityEditId.value = identity.id;
+    
+    $$('.identity-emoji-opt').forEach(b => b.classList.remove('selected'));
+    const emojiOpt = document.querySelector(`.identity-emoji-opt[data-emoji="${identity.emoji}"]`);
+    if (emojiOpt) emojiOpt.classList.add('selected');
+    dom.identityEmoji.value = identity.emoji;
+    
+    renderIdentityHabitLinker(identity.habitIds || []);
+    
+    dom.identityModal.style.display = 'flex';
+    dom.identityStatement.focus();
+  }
+
+  function closeIdentityModal() {
+    dom.identityModal.style.display = 'none';
+  }
+
+  function saveIdentity(e) {
+    e.preventDefault();
+    const statement = dom.identityStatement.value.trim();
+    if (!statement) return;
+    
+    const editId = dom.identityEditId.value;
+    const emoji = dom.identityEmoji.value;
+    const linkedHabitIds = Array.from(dom.identityHabitLinker.querySelectorAll('input:checked')).map(cb => cb.value);
+    
+    state.identities = state.identities || [];
+    
+    if (editId) {
+      const idty = state.identities.find(i => i.id === editId);
+      if (idty) {
+        idty.statement = statement;
+        idty.emoji = emoji;
+        idty.habitIds = linkedHabitIds;
+      }
+    } else {
+      state.identities.push({
+        id: genId(),
+        emoji,
+        statement,
+        habitIds: linkedHabitIds,
+        createdAt: new Date().toISOString()
+      });
+    }
+    
+    saveState();
+    renderAll();
+    closeIdentityModal();
+  }
+
+  function deleteIdentity() {
+    const editId = dom.identityEditId.value;
+    if (!editId) return;
+    if (!confirm('Delete this identity? Your habits will not be deleted.')) return;
+    
+    state.identities = state.identities.filter(i => i.id !== editId);
+    saveState();
+    renderAll();
+    closeIdentityModal();
   }
 
   async function deleteHabit() {
@@ -1094,6 +1461,23 @@
     dom.habitForm.addEventListener('submit', saveHabit);
     dom.deleteHabitBtn.addEventListener('click', deleteHabit);
     dom.habitRepeatPattern.addEventListener('change', updateRepeatUI);
+
+    // Identity Modal
+    dom.addIdentityBtn.addEventListener('click', openAddIdentityModal);
+    dom.identityCloseBtn.addEventListener('click', closeIdentityModal);
+    dom.identityModal.addEventListener('click', (e) => {
+      if (e.target === dom.identityModal) closeIdentityModal();
+    });
+    dom.identityForm.addEventListener('submit', saveIdentity);
+    dom.deleteIdentityBtn.addEventListener('click', deleteIdentity);
+    
+    $$('.identity-emoji-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        $$('.identity-emoji-opt').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        dom.identityEmoji.value = btn.dataset.emoji;
+      });
+    });
 
     // Habit type toggle
     $$('.type-opt').forEach(btn => {
