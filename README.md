@@ -55,6 +55,7 @@
 - **Optimistic Sync** — The app falls back gracefully to `localStorage` when offline, and automatically syncs data with the backend when you are logged in.
 
 ### 📊 Gamification & Insights
+- **Identity Dashboard** — Shift your mindset by building identity-based habits (inspired by *Atomic Habits*). Define who you want to be (e.g., "I am an Athlete 🏃‍♂️") and link habits that cast "votes" for that identity. Watch your identity level up from Seedling 🌱 to Unshakeable 🏔️.
 - **Score Ring** — Visual progress indicator with an animated percentage completion.
 - **Streak Counter** — Track consecutive perfect days to maintain momentum.
 - **Weekly Heatmap** — See your weekly consistency at a glance with GitHub-style intensity levels.

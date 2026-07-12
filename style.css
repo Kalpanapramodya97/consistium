@@ -1400,6 +1400,432 @@ body {
 }
 
 /* ============================================
+   IDENTITY DASHBOARD — "Who am I becoming?"
+   ============================================ */
+
+.identity-section {
+  margin: 28px 0;
+}
+
+.identity-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.identity-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.identity-subtitle {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.identity-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Identity Card */
+.identity-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: var(--transition);
+  animation: identitySlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+  overflow: hidden;
+}
+
+.identity-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), #06b6d4, var(--accent-light));
+  opacity: 0.6;
+  transition: opacity var(--transition);
+}
+
+.identity-card:hover {
+  border-color: var(--border-active);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.08);
+}
+
+.identity-card:hover::before {
+  opacity: 1;
+}
+
+@keyframes identitySlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Identity Strength Ring */
+.identity-ring-container {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+
+.identity-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.identity-ring-bg {
+  fill: none;
+  stroke: var(--ring-bg);
+  stroke-width: 5;
+}
+
+.identity-ring-fill {
+  fill: none;
+  stroke: url(#identityGradient);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 163.36;
+  stroke-dashoffset: 163.36;
+  transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.identity-ring-emoji {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+
+/* Identity Info */
+.identity-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.identity-statement {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.identity-level-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.identity-level-badge.level-seedling {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.identity-level-badge.level-growing {
+  background: rgba(6, 182, 212, 0.1);
+  color: #06b6d4;
+  border: 1px solid rgba(6, 182, 212, 0.2);
+}
+
+.identity-level-badge.level-strong {
+  background: rgba(139, 92, 246, 0.1);
+  color: #8b5cf6;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.identity-level-badge.level-rooted {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.identity-level-badge.level-unshakeable {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15));
+  color: #ec4899;
+  border: 1px solid rgba(236, 72, 153, 0.25);
+}
+
+.identity-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.identity-votes {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.identity-vote-count {
+  font-family: var(--mono);
+  font-weight: 800;
+  font-size: 0.9rem;
+  background: linear-gradient(135deg, var(--accent-light), #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.identity-next-level {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Linked Habits Pills */
+.identity-habits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.identity-habit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.identity-habit-pill-emoji {
+  font-size: 0.75rem;
+}
+
+/* Identity Card Actions */
+.identity-edit-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  transition: var(--transition);
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.identity-card:hover .identity-edit-btn {
+  opacity: 1;
+}
+
+.identity-edit-btn:hover {
+  color: var(--accent-light);
+  background: var(--bg-elevated);
+}
+
+/* Empty State */
+.identity-empty {
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  padding: 32px 20px;
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  font-style: italic;
+  line-height: 1.6;
+}
+
+/* Progress toward next level */
+.identity-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--ring-bg);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.identity-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #06b6d4);
+  border-radius: 2px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Identity Modal — Habit Linker */
+.identity-habit-linker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.identity-habit-linker::-webkit-scrollbar {
+  width: 4px;
+}
+
+.identity-habit-linker::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.identity-link-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.identity-link-opt:hover {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+}
+
+.identity-link-opt.selected {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+  color: var(--text-primary);
+}
+
+.identity-link-opt input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.identity-link-emoji {
+  font-size: 1.1rem;
+  width: 28px;
+  text-align: center;
+}
+
+.identity-link-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+/* Identity tags in habit modal */
+.identity-tag-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.identity-tag-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: var(--transition);
+  color: var(--text-secondary);
+  font-family: var(--font);
+}
+
+.identity-tag-opt:hover {
+  border-color: var(--accent);
+}
+
+.identity-tag-opt.selected {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.identity-tag-opt input[type="checkbox"] {
+  display: none;
+}
+
+/* No identities hint in habit modal */
+.identity-tag-empty {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .identity-card {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .identity-ring-container {
+    width: 52px;
+    height: 52px;
+  }
+
+  .identity-ring-emoji {
+    font-size: 1.1rem;
+  }
+
+  .identity-statement {
+    font-size: 0.88rem;
+    flex-wrap: wrap;
+  }
+
+  .identity-meta {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .identity-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* ============================================
    AI HABIT ADVISOR PANEL
    ============================================ */
 
