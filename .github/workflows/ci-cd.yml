@@ -263,7 +263,7 @@ jobs:
           fi
 
       - name: Run k6 Load Test
-        run: docker run --rm --network host -v ${{ github.workspace }}:/workspace -w /workspace grafana/k6:latest run --out json=k6-results.json tests/k6/load-test.js
+        run: docker run --rm --network host --user $(id -u):$(id -g) -v ${{ github.workspace }}:/workspace -w /workspace grafana/k6:latest run --out json=k6-results.json tests/k6/load-test.js
 
       - name: Upload k6 results
         if: always()
