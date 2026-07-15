@@ -1,6 +1,6 @@
 # Unified CI/CD & DevSecOps Pipeline
 
-Consistium uses a single, unified pipeline defined in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) that automatically builds, tests, secures, and releases the application on every push and pull request. This pipeline orchestrates **12 discrete jobs across 3 phases**, implementing a robust "Shift-Left" security posture.
+Consistium uses a single, unified pipeline defined in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) that automatically builds, tests, secures, and releases the application on every push and pull request. This pipeline orchestrates **13 discrete jobs across 3 phases**, implementing a robust "Shift-Left" security posture.
 
 ---
 
@@ -21,6 +21,7 @@ flowchart TD
         sast["codeql-sast"]
         fs["trivy-fs-scan"]
         dast["dast-scan"]
+        k6["k6-load-test"]
     end
 
     subgraph phase2 ["Phase 2 — Build, Scan & SBOM"]
@@ -34,7 +35,7 @@ flowchart TD
     end
 
     trigger --> phase1
-    qc & bt & tc & ie & ss & sast & fs & dast --> docker
+    qc & bt & tc & ie & ss & sast & fs & dast & k6 --> docker
     docker --> semver
     sbomfs --> semver
     docker --> report
@@ -112,20 +113,27 @@ These jobs run completely in parallel, completing in minutes to provide immediat
 - Runs OWASP ZAP baseline scan against the running container network.
 - Identifies runtime vulnerabilities like missing headers and misconfigurations.
 
+### 9. Performance & Load Testing (`k6-load-test`)
+- Starts the application stack using `docker compose up -d`.
+- Waits for the application to report healthy status.
+- Runs a **k6** load test script simulating 20 concurrent users over 50 seconds using the host network.
+- Fails the pipeline if 95th percentile latency exceeds 500ms or if error rate exceeds 1%.
+- Generates JSON results uploaded as pipeline artifacts.
+
 ---
 
 ## Phase 2: Build, Scan & SBOM
 
 This phase executes only if **all** Phase 1 jobs succeed.
 
-### 9. Build, Scan & Push (`docker-build-scan-push`)
+### 10. Build, Scan & Push (`docker-build-scan-push`)
 - Configures Docker Buildx for multi-architecture support.
 - Builds the `consistium` image and loads it into the local Docker daemon.
 - **Trivy Image Scan**: Scans the compiled image for OS-level CVEs (e.g., Alpine packages).
 - **Syft SBOM (Image)**: Generates two SBOM files from the Docker image in **CycloneDX JSON** and **SPDX JSON** formats. Uploaded as 90-day pipeline artifacts.
 - Pushes the image to **GitHub Container Registry (GHCR)** automatically, tagged with the commit SHA and `latest`.
 
-### 9b. Filesystem SBOM (`sbom-filesystem`) *(runs in parallel)*
+### 10b. Filesystem SBOM (`sbom-filesystem`) *(runs in parallel)*
 - Installs backend npm dependencies for accurate package resolution.
 - Uses **Anchore Syft v1.4.1** to generate SBOMs from the project filesystem.
 - Produces **CycloneDX JSON** and **SPDX JSON** — covering all npm packages, OS packages, and source files.
@@ -135,7 +143,7 @@ This phase executes only if **all** Phase 1 jobs succeed.
 
 ## Phase 3: Release & Reporting
 
-### 10a. Semantic Versioning (`semantic-versioning`)
+### 11a. Semantic Versioning (`semantic-versioning`)
 *(Only runs on `push` to `main`/`master`)*
 - Automatically calculates the next semantic version tag (e.g., v1.2.3) based on commit history.
 - Downloads the 4 SBOM files generated in Phase 2 and attaches them to the GitHub Release as downloadable assets:
@@ -143,7 +151,7 @@ This phase executes only if **all** Phase 1 jobs succeed.
   - `sbom-fs-cyclonedx.json`, `sbom-fs-spdx.json` (Filesystem/npm)
 - Generates an HTML Release Document and emails it to the DevOps team using `dawidd6/action-send-mail`.
 
-### 10b. Security Report (`security-report`)
+### 11b. Security Report (`security-report`)
 *(Always runs, even if earlier jobs fail)*
 - Downloads JSON artifacts from TruffleHog, CodeQL, Trivy (FS & Image), Infracost, and **both SBOM scans**.
 - Executes `security/generate-report.sh`.
