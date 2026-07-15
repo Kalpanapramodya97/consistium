@@ -232,6 +232,50 @@ jobs:
           path: report_html.html
           retention-days: 7
 
+  k6-load-test:
+    name: k6 Performance & Load Test
+    runs-on: ubuntu-latest
+    needs: [backend-tests]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Start Application Stack
+        run: docker compose up -d consistium backend mongodb
+
+      - name: Wait for Application to be Ready
+        run: |
+          echo "Waiting for frontend to be available at http://localhost:3000..."
+          app_ready=false
+          for i in {1..15}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+              echo "Application is up and running!"
+              app_ready=true
+              break
+            fi
+            echo "Waiting..."
+            sleep 5
+          done
+          if [ "$app_ready" = false ]; then
+            echo "Application failed to start!"
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Run k6 Load Test
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: tests/k6/load-test.js
+          flags: --out json=k6-results.json
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results
+          path: k6-results.json
+          retention-days: 7
+
   trivy-fs-scan:
     name: Trivy Filesystem Scan
     runs-on: ubuntu-latest
@@ -271,7 +315,7 @@ jobs:
   docker-build-scan-push:
     name: Build, Scan & Push Docker Image
     runs-on: ubuntu-latest
-    needs: [quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, dast-scan]
+    needs: [quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, dast-scan, k6-load-test]
     permissions:
       contents: read
       packages: write
@@ -560,7 +604,7 @@ jobs:
   security-report:
     name: Generate DevSecOps & FinOps Report
     runs-on: ubuntu-latest
-    needs: [quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, docker-build-scan-push, dast-scan, sbom-filesystem]
+    needs: [quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, docker-build-scan-push, dast-scan, k6-load-test, sbom-filesystem]
     if: always() # Generate report even if scans fail — runs on PRs AND master
     # NOTE: No environment gate here — this job runs on every PR run.
     # The environment gate lives only on semantic-versioning (master-only).
