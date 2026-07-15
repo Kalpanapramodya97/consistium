@@ -356,13 +356,13 @@ graph TB
 
 ## CI/CD Layer
 
-The project uses a **unified** GitHub Actions workflow ([`ci-cd.yml`](file:///f:/habit-tracker/.github/workflows/ci-cd.yml)) that combines CI/CD and DevSecOps into a single pipeline with 3 phases and 10 jobs.
+The project uses a **unified** GitHub Actions workflow ([`ci-cd.yml`](file:///f:/habit-tracker/.github/workflows/ci-cd.yml)) that combines CI/CD and DevSecOps into a single pipeline with 3 phases and 13 jobs.
 
 ### Pipeline Overview
 
 | Phase | Jobs | Purpose |
 |---|---|---|
-| **Phase 1: Source Checks** (Parallel) | `quality-checks`, `backend-tests`, `terraform-checks`, `infracost-estimation`, `secret-scan`, `codeql-sast`, `trivy-fs-scan`, `dast-scan` | Lint, test, scan, and validate |
+| **Phase 1: Source Checks** (Parallel) | `quality-checks`, `backend-tests`, `terraform-checks`, `infracost-estimation`, `secret-scan`, `codeql-sast`, `trivy-fs-scan`, `dast-scan`, `k6-load-test` | Lint, test, scan, load test, and validate |
 | **Phase 2: Build & Scan** | `docker-build-scan-push` | Build Docker image, Trivy image scan, push to GHCR |
 | **Phase 3: Release & Report** | `semantic-versioning`, `security-report` | Version tagging, GitHub Release, branded security + FinOps report |
 
