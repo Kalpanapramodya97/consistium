@@ -263,10 +263,7 @@ jobs:
           fi
 
       - name: Run k6 Load Test
-        uses: grafana/k6-action@v0.3.1
-        with:
-          filename: tests/k6/load-test.js
-          flags: --out json=k6-results.json
+        run: docker run --rm --network host -v ${{ github.workspace }}:/workspace -w /workspace grafana/k6:latest run --out json=k6-results.json tests/k6/load-test.js
 
       - name: Upload k6 results
         if: always()
