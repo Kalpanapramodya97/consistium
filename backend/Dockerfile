@@ -51,7 +51,7 @@ COPY --chown=node:node . .
 EXPOSE 5000
 
 # Health check — lets orchestrators know when the API is responsive
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
   CMD wget -qO- http://localhost:5000/api/health || exit 1
 
 # Use dumb-init as PID 1 to handle signals properly
