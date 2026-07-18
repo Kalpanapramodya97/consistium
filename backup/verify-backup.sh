@@ -100,39 +100,44 @@ check "Temporary MongoDB started" "$(docker exec "${VERIFY_CONTAINER}" mongosh -
 # ── Test 3: Restore backup ──────────────────────────────────────────────────
 log_info "Test 3: Restoring backup..."
 
-RESTORE_RESULT=$(mongorestore \
-    --uri="mongodb://localhost:${VERIFY_PORT}" \
+RESTORE_RESULT=$(docker exec -i "${VERIFY_CONTAINER}" mongorestore \
+    --uri="mongodb://localhost:27017" \
     --db="${DB_NAME}" \
-    --archive="${BACKUP_FILE}" \
+    --archive \
     --gzip \
-    --quiet 2>&1 && echo "success" || echo "failed")
+    --quiet < "${BACKUP_FILE}" 2>&1 && echo "success" || echo "failed")
 
 check "Restore completed without errors" "$([ "${RESTORE_RESULT}" = "success" ] && echo true || echo false)"
 
 # ── Test 4: Verify data ─────────────────────────────────────────────────────
 log_info "Test 4: Verifying restored data..."
 
-VERIFY_URI="mongodb://localhost:${VERIFY_PORT}"
+VERIFY_URI="mongodb://localhost:27017"
+SOURCE_URI_HOST="${MONGO_URI}"
+# If MONGO_URI uses 'mongodb' hostname (docker-compose internal), map it to localhost for host-network execution
+if [[ "${SOURCE_URI_HOST}" == *"mongodb:27017"* ]]; then
+    SOURCE_URI_HOST="${SOURCE_URI_HOST/mongodb:27017/localhost:27017}"
+fi
 
 # Get collection count from restored backup
-RESTORED_COLLECTIONS=$(mongosh "${VERIFY_URI}/${DB_NAME}" --eval "db.getCollectionNames().length" --quiet 2>/dev/null || echo "0")
+RESTORED_COLLECTIONS=$(docker exec -i "${VERIFY_CONTAINER}" mongosh "${VERIFY_URI}/${DB_NAME}" --eval "db.getCollectionNames().length" --quiet 2>/dev/null || echo "0")
 check "Restored database has collections (${RESTORED_COLLECTIONS})" "$([ "${RESTORED_COLLECTIONS}" -gt 0 ] 2>/dev/null && echo true || echo false)"
 
 # Get collection names
-RESTORED_NAMES=$(mongosh "${VERIFY_URI}/${DB_NAME}" --eval "db.getCollectionNames().join(', ')" --quiet 2>/dev/null || echo "none")
+RESTORED_NAMES=$(docker exec -i "${VERIFY_CONTAINER}" mongosh "${VERIFY_URI}/${DB_NAME}" --eval "db.getCollectionNames().join(', ')" --quiet 2>/dev/null || echo "none")
 log_info "  Restored collections: ${RESTORED_NAMES}"
 
 # Compare with source database
-SOURCE_COLLECTIONS=$(mongosh "${MONGO_URI}/${DB_NAME}" --eval "db.getCollectionNames().length" --quiet 2>/dev/null || echo "?")
+SOURCE_COLLECTIONS=$(docker run --rm --network host mongo:6 mongosh "${SOURCE_URI_HOST}/${DB_NAME}" --eval "db.getCollectionNames().length" --quiet 2>/dev/null || echo "?")
 if [ "${SOURCE_COLLECTIONS}" != "?" ]; then
     check "Collection count matches source (${RESTORED_COLLECTIONS} == ${SOURCE_COLLECTIONS})" \
         "$([ "${RESTORED_COLLECTIONS}" = "${SOURCE_COLLECTIONS}" ] && echo true || echo false)"
     
     # Compare document counts per collection
-    COLLECTION_LIST=$(mongosh "${VERIFY_URI}/${DB_NAME}" --eval "db.getCollectionNames().forEach(function(c){print(c)})" --quiet 2>/dev/null || true)
+    COLLECTION_LIST=$(docker exec -i "${VERIFY_CONTAINER}" mongosh "${VERIFY_URI}/${DB_NAME}" --eval "db.getCollectionNames().forEach(function(c){print(c)})" --quiet 2>/dev/null || true)
     for COLL in ${COLLECTION_LIST}; do
-        SOURCE_COUNT=$(mongosh "${MONGO_URI}/${DB_NAME}" --eval "db.${COLL}.countDocuments()" --quiet 2>/dev/null || echo "?")
-        RESTORED_COUNT=$(mongosh "${VERIFY_URI}/${DB_NAME}" --eval "db.${COLL}.countDocuments()" --quiet 2>/dev/null || echo "?")
+        SOURCE_COUNT=$(docker run --rm --network host mongo:6 mongosh "${SOURCE_URI_HOST}/${DB_NAME}" --eval "db.${COLL}.countDocuments()" --quiet 2>/dev/null || echo "?")
+        RESTORED_COUNT=$(docker exec -i "${VERIFY_CONTAINER}" mongosh "${VERIFY_URI}/${DB_NAME}" --eval "db.${COLL}.countDocuments()" --quiet 2>/dev/null || echo "?")
         check "  ${COLL}: document count matches (${RESTORED_COUNT} == ${SOURCE_COUNT})" \
             "$([ "${RESTORED_COUNT}" = "${SOURCE_COUNT}" ] && echo true || echo false)"
     done
