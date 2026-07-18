@@ -1,0 +1,29 @@
+{
+  "name": "consistium",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Consistium — Habit Tracker (DevOps Root)",
+  "scripts": {
+    "prepare": "husky",
+    "lint:html": "npx htmlhint \"*.html\" \"admin.html\"",
+    "lint:docker": "docker run --rm -i hadolint/hadolint < Dockerfile",
+    "test": "cd backend && npm test"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0"
+  },
+  "lint-staged": {
+    "*.html": [
+      "npx htmlhint"
+    ],
+    "Dockerfile*": [
+      "docker run --rm -i hadolint/hadolint"
+    ],
+    "*.js": [
+      "node --check"
+    ]
+  }
+}
