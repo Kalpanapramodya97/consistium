@@ -20,3 +20,10 @@ trivy-fs.json
 
 # Secrets — never commit these
 .env
+
+# MongoDB backups (keep .gitkeep, ignore actual dumps)
+backups/*.gz
+
+# Root dev dependencies (husky, commitlint)
+/node_modules/
+/package-lock.json

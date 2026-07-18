@@ -17,6 +17,36 @@ jobs:
   # ==========================================
   # PHASE 1: Source Code Checks (Parallel)
   # ==========================================
+  commitlint:
+    name: Commit Message Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Dependencies
+        run: npm ci
+      - name: Run Commitlint
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha || github.event.before }} --to ${{ github.event.pull_request.head.sha || github.sha }} --verbose
+
+  backup-test:
+    name: Verify Backup/Restore Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Start Database
+        run: docker compose up -d mongodb
+      - name: Run Backup
+        run: make backup
+      - name: Verify Backup
+        run: make verify-backup
+
   quality-checks:
     name: Code Quality & Linting
     runs-on: ubuntu-latest
@@ -312,7 +342,7 @@ jobs:
   docker-build-scan-push:
     name: Build, Scan & Push Docker Image
     runs-on: ubuntu-latest
-    needs: [quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, dast-scan, k6-load-test]
+    needs: [commitlint, backup-test, quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, dast-scan, k6-load-test]
     permissions:
       contents: read
       packages: write
@@ -601,7 +631,7 @@ jobs:
   security-report:
     name: Generate DevSecOps & FinOps Report
     runs-on: ubuntu-latest
-    needs: [quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, docker-build-scan-push, dast-scan, k6-load-test, sbom-filesystem]
+    needs: [commitlint, backup-test, quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, docker-build-scan-push, dast-scan, k6-load-test, sbom-filesystem]
     if: always() # Generate report even if scans fail — runs on PRs AND master
     # NOTE: No environment gate here — this job runs on every PR run.
     # The environment gate lives only on semantic-versioning (master-only).

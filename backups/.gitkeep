@@ -1,0 +1,1 @@
+# This directory stores MongoDB backups. Actual .gz files are gitignored.
