@@ -17,7 +17,7 @@ set -euo pipefail
 # ── Configuration ─────────────────────────────────────────────────────────────
 MONGO_URI="${MONGO_URI:-mongodb://mongodb:27017}"
 DB_NAME="${DB_NAME:-consistium}"
-BACKUP_DIR="${BACKUP_DIR:-/workspace/backups}"
+BACKUP_DIR="${BACKUP_DIR:-./backups}"
 RETENTION_COUNT="${RETENTION_COUNT:-7}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${TIMESTAMP}.gz"

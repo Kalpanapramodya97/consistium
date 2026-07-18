@@ -15,7 +15,7 @@ set -euo pipefail
 # ── Configuration ─────────────────────────────────────────────────────────────
 MONGO_URI="${MONGO_URI:-mongodb://mongodb:27017}"
 DB_NAME="${DB_NAME:-consistium}"
-BACKUP_DIR="${BACKUP_DIR:-/workspace/backups}"
+BACKUP_DIR="${BACKUP_DIR:-./backups}"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
