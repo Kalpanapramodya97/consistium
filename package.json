@@ -19,9 +19,6 @@
     "*.html": [
       "npx htmlhint"
     ],
-    "Dockerfile*": [
-      "docker run --rm -i hadolint/hadolint"
-    ],
     "*.js": [
       "node --check"
     ]

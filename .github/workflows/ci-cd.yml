@@ -41,7 +41,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
       - name: Start Database
-        run: docker compose up -d mongodb
+        run: docker compose up -d --wait mongodb
+      - name: Seed Database
+        run: |
+          docker compose exec -T mongodb mongosh consistium --eval 'db.habits.insertOne({name: "CI/CD Test Habit"})'
       - name: Run Backup
         run: make backup
       - name: Verify Backup
