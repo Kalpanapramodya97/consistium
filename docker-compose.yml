@@ -19,7 +19,7 @@ services:
           cpus: '0.05'
           memory: 8M
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      test: ["CMD", "wget", "-qO-", "http://0.0.0.0:80/"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -54,7 +54,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5000/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://0.0.0.0:5000/api/health"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -74,7 +74,7 @@ services:
     restart: unless-stopped
     profiles: ["monitoring", "full"]
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9113/metrics"]
+      test: ["CMD", "wget", "-qO-", "http://0.0.0.0:9113/metrics"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -101,7 +101,7 @@ services:
       - '--web.console.templates=/usr/share/prometheus/consoles'
       - '--web.enable-lifecycle'   # POST /-/reload for hot-reload
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      test: ["CMD", "wget", "-qO-", "http://0.0.0.0:9090/-/healthy"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -125,7 +125,7 @@ services:
     restart: unless-stopped
     profiles: ["monitoring", "full"]
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/healthy"]
+      test: ["CMD", "wget", "-qO-", "http://0.0.0.0:9093/-/healthy"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -144,7 +144,7 @@ services:
     restart: unless-stopped
     profiles: ["monitoring", "full"]
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://0.0.0.0:3000/api/health"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -161,7 +161,7 @@ services:
     restart: unless-stopped
     profiles: ["monitoring", "full"]
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      test: ["CMD", "wget", "-qO-", "http://0.0.0.0:3100/ready"]
       interval: 15s
       timeout: 5s
       retries: 3
