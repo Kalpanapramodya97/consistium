@@ -44,6 +44,7 @@
 - **Good vs. Bad Habits** — Build positive routines or track habits you're trying to break. 
   - *Bad habits use reverse logic: they are marked as "Resisted ✓" by default and only "Slipped ✗" if checked.*
 - **Special Tasks** — Add one-off daily tasks that do not repeat but contribute to your daily score.
+- **Repeat Patterns** — Customize how often each habit repeats: every day, every other day, specific days of the week, weekdays only, weekends only, or a custom interval.
 - **Full CRUD** — Easily Add, Edit, or Delete habits with a built-in emoji picker.
 
 ### 👥 Multi-User & Admin Panel
@@ -88,14 +89,17 @@ Run with Docker Compose for a production-ready Nginx setup, Node.js Backend, Mon
 To make running commands easier, this project includes a `Makefile` (for Linux/macOS) and a `manage.ps1` (for Windows PowerShell).
 
 ```bash
-# Windows (PowerShell)
+# App only (frontend + backend + MongoDB) — fastest startup
+make dev
+
+# Full stack (app + monitoring + alerting + logging)
+make up          # or: docker compose --profile full up -d
+
+# Monitoring stack only
+make monitor     # or: docker compose --profile monitoring up -d
+
+# Windows (PowerShell) — starts app layer
 .\manage.ps1 up
-
-# Linux / macOS
-make up
-
-# Or standard Docker
-docker compose up -d
 ```
 
 #### Testing Persistence with Docker Compose
@@ -103,13 +107,27 @@ To verify that your habit data is safely stored outside the container, you can s
 ```bash
 # 1. Create some habit data in the app
 # 2. Stop and remove the containers
-docker compose down
+make down       # or: docker compose --profile full down
 # 3. Start the containers again
-docker compose up -d
+make up
 # 4. Verify your data is still present!
 ```
 > [!WARNING]
-> Do NOT use `docker compose down -v` unless you intentionally want to delete all database volumes and destroy your data.
+> Do NOT use `make clean` / `docker compose down -v` unless you intentionally want to delete all database volumes and destroy your data.
+
+#### 🗄️ MongoDB Backup & Restore
+The project includes automated backup and restore scripts for MongoDB:
+```bash
+# Create a backup (saved to ./backups/)
+make backup
+
+# Restore from a backup (interactive)
+make restore
+
+# Verify the latest backup by restoring to a temporary container
+make verify-backup
+```
+Backups are stored in the `backups/` directory and the retention policy keeps the last 7 backups by default.
 
 #### 🔗 Accessing the Applications
 
@@ -163,6 +181,16 @@ kubectl delete pod consistium-mongodb-0 -n consistium-prod
 
 > 📚 See the full [Kubernetes Deployment Guide](docs/devops/kubernetes.md) for more details.
 
+### 🛠️ Developer Setup
+If you plan to contribute, set up the pre-commit hooks and commit linting:
+```bash
+# Install Husky hooks + commitlint (first-time only)
+make setup       # or: npm install
+```
+This enables:
+- **Husky pre-commit hooks** — runs linters automatically before each commit.
+- **Commitlint** — enforces [Conventional Commits](https://www.conventionalcommits.org/) format (e.g., `feat:`, `fix:`, `docs:`).
+
 ---
 
 ## 🛠 DevSecOps & Architecture
@@ -177,7 +205,7 @@ Consistium goes beyond just being a frontend app—it serves as a **reference ar
 | **Infrastructure** | Terraform (VPC, EKS, DocumentDB), modular IaC, multi-env |
 | **Observability** | Prometheus, Grafana, Loki (LogQL), Alertmanager |
 | **FinOps** | Infracost (Cloud Cost Estimation) |
-| **Performance Testing** | k6 (Load Testing in CI/CD) |
+| **Performance Testing** | k6 (Load Testing in CI/CD, host network, 20 VUs) |
 | **Security (CI/CD)** | GitHub Actions, TruffleHog (Secrets), CodeQL (SAST), Trivy (CVEs), OWASP ZAP (DAST), Ansible |
 | **SBOM** | Anchore Syft — CycloneDX JSON + SPDX JSON attached to every GitHub Release |
 | **API Security** | express-rate-limit (brute-force protection), express-mongo-sanitize (NoSQL injection), XSS-safe DOM construction |

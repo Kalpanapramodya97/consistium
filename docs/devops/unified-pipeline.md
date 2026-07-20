@@ -108,13 +108,13 @@ These jobs run completely in parallel, completing in minutes to provide immediat
 - Generates JSON for the final report.
 
 ### 8. DAST (`dast-scan`)
-- Starts the application stack using `docker compose up -d`.
+- Starts the application stack using `docker compose up -d --wait`.
 - Waits for the application to report healthy status.
 - Runs OWASP ZAP baseline scan against the running container network.
 - Identifies runtime vulnerabilities like missing headers and misconfigurations.
 
 ### 9. Performance & Load Testing (`k6-load-test`)
-- Starts the application stack using `docker compose up -d`.
+- Starts the application stack using `docker compose up -d --wait`.
 - Waits for the application to report healthy status.
 - Runs a **k6** load test script simulating 20 concurrent users over 50 seconds using the host network.
 - Fails the pipeline if 95th percentile latency exceeds 500ms or if error rate exceeds 1%.
