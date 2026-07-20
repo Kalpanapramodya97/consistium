@@ -120,10 +120,13 @@ jobs:
         uses: terraform-linters/setup-tflint@v4
         with:
           tflint_version: v0.50.3
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Init TFLint
         working-directory: ./terraform
         run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run TFLint
         working-directory: ./terraform
