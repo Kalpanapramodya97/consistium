@@ -33,6 +33,7 @@ graph TB
 
         subgraph Automation["Automation Layer"]
             Ansible["ansible-runner<br/>TruffleHog + Trivy<br/>(run once)"]
+            Backup["backup<br/>MongoDB backup<br/>(one-shot)"]
         end
     end
 
@@ -64,6 +65,7 @@ graph TB
 
     Consistium -->|"API calls :5000"| Backend
     Backend -->|"mongoose :27017"| MongoDB
+    MongoDB -.->|"mongodump"| Backup
 
     Consistium -->|"/stub_status"| Exporter
     Backend -->|"/api/metrics"| Prometheus

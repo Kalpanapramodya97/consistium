@@ -70,6 +70,7 @@ This directory contains comprehensive documentation for the DevOps and DevSecOps
 | Secret Scanning | TruffleHog | latest |
 | Vulnerability Scanning | Aqua Trivy | latest |
 | DAST | OWASP ZAP | zaproxy/action-baseline@v0.14.0 |
+| **Performance Testing** | **k6** | **latest** |
 | **SBOM Generation** | **Anchore Syft** | **v1.4.1** |
 | HTML Linting | HTMLHint | latest |
 | Dockerfile Linting | Hadolint | v3.1.0 |
@@ -115,7 +116,8 @@ graph TB
         C --> C4["Security Scans"]
         C --> C5["Infracost"]
         C --> C6["DAST (ZAP)"]
-        C1 & C2 & C3 & C4 & C5 & C6 --> D["Phase 2: Build, Scan & SBOM"]
+        C --> C7["Performance (k6)"]
+        C1 & C2 & C3 & C4 & C5 & C6 & C7 --> D["Phase 2: Build, Scan & SBOM"]
         D --> D1["Docker Build + Trivy + Syft SBOM"]
         D --> D2["Filesystem SBOM (parallel)"]
         D1 & D2 --> E["Phase 3: Release & Report"]

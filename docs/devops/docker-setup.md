@@ -111,7 +111,11 @@ RUN npm ci --omit=dev && \
 FROM node:20-alpine AS production
 
 LABEL org.opencontainers.image.title="Consistium Backend" \
-      org.opencontainers.image.description="Consistium Habit Tracker API — Express.js backend"
+      org.opencontainers.image.description="Consistium Habit Tracker API — Express.js backend" \
+      org.opencontainers.image.authors="Kalpana Pramodya <kalpanapramodya97@gmail.com>" \
+      org.opencontainers.image.source="https://github.com/Kalpanapramodya97/consistium" \
+      org.opencontainers.image.licenses="AGPL-3.0" \
+      org.opencontainers.image.vendor="Consistium"
 
 RUN apk add --no-cache dumb-init
 
@@ -127,8 +131,8 @@ COPY --chown=node:node . .
 
 EXPOSE 5000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:5000/api/health || exit 1
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
+  CMD wget -qO- http://0.0.0.0:5000/api/health || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "server.js"]
@@ -139,7 +143,7 @@ CMD ["node", "server.js"]
 | Stage | Base Image | Purpose |
 |-------|-----------|---------|
 | **Stage 1: Builder** | `node:20-alpine` | Installs production dependencies only (`--omit=dev`), excluding test frameworks and dev tools. Cleans npm cache to reduce layer size. |
-| **Stage 2: Production** | `node:20-alpine` | Installs `dumb-init` for proper PID 1 signal handling, copies only production `node_modules` from the builder, and runs as the built-in `node` user. |
+| **Stage 2: Production** | `node:20-alpine` | Installs `dumb-init` for proper PID 1 signal handling, copies only production `node_modules` from the builder, and runs as the built-in `node` user. Healthcheck uses `wget -qO-` against `0.0.0.0:5000` with a 30-second start period and 5 retries to accommodate slower CI environments. |
 
 ### Why dumb-init?
 
@@ -223,7 +227,7 @@ Enables client-side routing: if a user navigates directly to `/settings` or `/da
 
 ## Docker Compose Services
 
-The `docker-compose.yml` defines **nine services** forming a complete application-plus-observability stack:
+The `docker-compose.yml` defines **eleven services** forming a complete application-plus-observability stack, organized using **Docker Compose profiles** (`monitoring`, `full`, `backup`) to allow selective startup:
 
 ```mermaid
 graph LR
@@ -239,6 +243,7 @@ graph LR
     BB -->|"container logs"| F
     F -->|"push"| G["loki :3100"]
     G -->|"data source"| E
+    DB -.->|"mongodump"| BK["backup (one-shot)"]
 ```
 
 ### 1. `consistium` — Frontend Server
@@ -251,7 +256,8 @@ consistium:
     - "3000:80"
   restart: unless-stopped
   depends_on:
-    - backend
+    backend:
+      condition: service_healthy
   deploy:
     resources:
       limits:
@@ -261,19 +267,20 @@ consistium:
         cpus: '0.05'
         memory: 8M
   healthcheck:
-    test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+    test: ["CMD", "wget", "-qO-", "http://0.0.0.0:80/"]
     interval: 30s
     timeout: 5s
     retries: 3
+    start_period: 10s
 ```
 
 | Field | Purpose |
 |-------|---------|
 | `build: .` | Builds from the multi-stage Dockerfile in the project root. |
 | `ports: "3000:80"` | Maps host port **3000** to container port **80**. |
-| `depends_on: backend` | Ensures the backend API starts before the frontend. |
+| `depends_on: backend: condition: service_healthy` | Waits until the backend passes its healthcheck before starting the frontend. |
 | `deploy.resources` | Memory limit 32M, CPU limit 0.25 cores (see [Resource Management](#resource-management)). |
-| `healthcheck` | Uses `wget` to verify the container is responsive. |
+| `healthcheck` | Uses `wget -qO-` against `0.0.0.0` to verify the container is responsive. |
 
 ### 2. `backend` — Express API Server
 
@@ -288,8 +295,15 @@ backend:
     - JWT_SECRET=super_secret_consistium_key_change_in_prod
     - PORT=5000
   depends_on:
-    - mongodb
+    mongodb:
+      condition: service_healthy
   restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://0.0.0.0:5000/api/health"]
+    interval: 15s
+    timeout: 5s
+    retries: 5
+    start_period: 30s
 ```
 
 | Field | Purpose |
@@ -297,7 +311,8 @@ backend:
 | `build: ./backend` | Builds from the multi-stage Dockerfile in `./backend/`. |
 | `ports: "5000:5000"` | Exposes the Express API on port 5000. |
 | `environment` | Sets MongoDB connection URI, JWT secret, and server port. |
-| `depends_on: mongodb` | Ensures MongoDB starts before the backend attempts to connect. |
+| `depends_on: mongodb: condition: service_healthy` | Waits until MongoDB passes its healthcheck before the backend attempts to connect. |
+| `healthcheck` | Uses `wget -qO-` against `0.0.0.0:5000` with a 30-second start period and 5 retries to accommodate slower startups in CI. |
 
 > [!WARNING]
 > The `JWT_SECRET` in the compose file is a development placeholder. **Always** use a strong, unique secret in production, stored in environment variables or a secret manager.
@@ -313,6 +328,12 @@ mongodb:
   volumes:
     - mongodb_data:/data/db
   restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+    start_period: 15s
 ```
 
 | Field | Purpose |
@@ -320,6 +341,7 @@ mongodb:
 | `image: mongo:6` | Official MongoDB 6 image. |
 | `ports: "27017:27017"` | Exposes MongoDB for direct access and debugging. |
 | `volumes` | Named volume `mongodb_data` persists data across container restarts. |
+| `healthcheck` | Uses `mongosh` to ping the server. Other services use `condition: service_healthy` to wait until MongoDB is ready. |
 
 ### 4. `nginx-exporter` — Metrics Bridge
 
@@ -332,8 +354,15 @@ nginx-exporter:
   ports:
     - "9113:9113"
   depends_on:
-    - consistium
+    consistium:
+      condition: service_healthy
   restart: unless-stopped
+  profiles: ["monitoring", "full"]
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://0.0.0.0:9113/metrics"]
+    interval: 15s
+    timeout: 5s
+    retries: 3
 ```
 
 | Field | Purpose |
@@ -355,14 +384,22 @@ prometheus:
   ports:
     - "9090:9090"
   depends_on:
-    - alertmanager
+    alertmanager:
+      condition: service_healthy
   restart: unless-stopped
+  profiles: ["monitoring", "full"]
   command:
     - '--config.file=/etc/prometheus/prometheus.yml'
     - '--storage.tsdb.path=/prometheus'
     - '--web.console.libraries=/usr/share/prometheus/console_libraries'
     - '--web.console.templates=/usr/share/prometheus/consoles'
     - '--web.enable-lifecycle'
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://0.0.0.0:9090/-/healthy"]
+    interval: 15s
+    timeout: 5s
+    retries: 3
+    start_period: 10s
 ```
 
 | Field | Purpose |
@@ -390,6 +427,13 @@ alertmanager:
     - '-c'
     - 'sed "s/\$${SMTP_PASSWORD}/$$SMTP_PASSWORD/g" /etc/alertmanager/alertmanager.yml > /tmp/alertmanager.yml && /bin/alertmanager --config.file=/tmp/alertmanager.yml --storage.path=/alertmanager --web.external-url=http://localhost:9093'
   restart: unless-stopped
+  profiles: ["monitoring", "full"]
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://0.0.0.0:9093/-/healthy"]
+    interval: 15s
+    timeout: 5s
+    retries: 3
+    start_period: 10s
 ```
 
 | Field | Purpose |
@@ -413,6 +457,13 @@ grafana:
     - ./grafana/provisioning:/etc/grafana/provisioning
     - ./grafana/dashboards:/var/lib/grafana/dashboards
   restart: unless-stopped
+  profiles: ["monitoring", "full"]
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://0.0.0.0:3000/api/health"]
+    interval: 15s
+    timeout: 5s
+    retries: 3
+    start_period: 15s
 ```
 
 | Field | Purpose |
@@ -434,6 +485,13 @@ loki:
     - ./loki/loki-config.yml:/etc/loki/local-config.yaml
   command: -config.file=/etc/loki/local-config.yaml
   restart: unless-stopped
+  profiles: ["monitoring", "full"]
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://0.0.0.0:3100/ready"]
+    interval: 15s
+    timeout: 5s
+    retries: 3
+    start_period: 15s
 ```
 
 | Field | Purpose |
@@ -453,6 +511,10 @@ promtail:
     - /var/run/docker.sock:/var/run/docker.sock
   command: -config.file=/etc/promtail/config.yml
   restart: unless-stopped
+  profiles: ["monitoring", "full"]
+  depends_on:
+    loki:
+      condition: service_healthy
 ```
 
 | Field | Purpose |
@@ -485,6 +547,35 @@ ansible-runner:
 | `restart: "no"` | Runs once and exits — does not restart like long-running services. |
 
 The ansible-runner executes the security report generation playbook, which runs TruffleHog secret scanning, Trivy vulnerability scanning, and generates a branded HTML security report.
+
+### 11. `backup` — MongoDB Backup Service (One-Shot)
+
+```yaml
+backup:
+  image: mongo:6
+  container_name: consistium-backup
+  volumes:
+    - ./backup:/scripts:ro
+    - ./backups:/workspace/backups
+  entrypoint: ["bash", "/scripts/backup.sh"]
+  environment:
+    - MONGO_URI=mongodb://mongodb:27017
+    - DB_NAME=consistium
+    - BACKUP_DIR=/workspace/backups
+    - RETENTION_COUNT=7
+  depends_on:
+    mongodb:
+      condition: service_healthy
+  restart: "no"
+  profiles: ["backup"]
+```
+
+| Field | Purpose |
+|-------|---------|
+| `image` | Reuses the MongoDB image to access `mongodump`. |
+| `volumes` | Mounts the backup script (read-only) and the host backups directory. |
+| `environment` | Configures the backup script via env vars (7-day retention). |
+| `profiles: ["backup"]` | Prevents the service from starting automatically with `docker compose up`. Runs only when explicitly called. |
 
 ---
 
@@ -528,7 +619,7 @@ The 8 MB reservation ensures the container is not starved by noisy neighbors on 
 
 ```yaml
 healthcheck:
-  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+  test: ["CMD", "wget", "-qO-", "http://0.0.0.0:80/"]
   interval: 30s
   timeout: 5s
   retries: 3
@@ -539,7 +630,7 @@ healthcheck:
 
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
-| `test` | `wget --no-verbose --tries=1 --spider http://localhost:80/` | HTTP HEAD request. Uses `wget` because it is available in Alpine by default; `curl` is not. Exit code 0 = healthy. |
+| `test` | `wget -qO- http://0.0.0.0:80/` | HTTP GET request. Uses `wget` because it is available in Alpine by default; `curl` is not. `-qO-` makes it quiet and writes output to stdout. |
 | `interval` | `30s` | Health check frequency. |
 | `timeout` | `5s` | Maximum response time before failure. |
 | `retries` | `3` | Container marked **unhealthy** after 3 consecutive failures. |
@@ -566,7 +657,7 @@ When combined with `restart: unless-stopped`, an unhealthy container is automati
 
 ### Docker Compose Default Network
 
-Docker Compose automatically creates a **bridge network** for the stack (e.g., `consistium_default`). All nine services are attached to this network and can communicate using their **service names** as hostnames.
+Docker Compose automatically creates a **bridge network** for the stack (e.g., `consistium_default`). All eleven services are attached to this network and can communicate using their **service names** as hostnames.
 
 ```mermaid
 graph TB
@@ -643,21 +734,23 @@ graph TB
 ### Starting the Stack
 
 ```bash
-# Build and start all services in detached mode
-docker compose up -d --build
+# Build and start all services in detached mode (using full profile)
+docker compose --profile full up -d --build
+# Or using the helper script:
+make up
 
-# Start without rebuilding (uses cached images)
-docker compose up -d
+# Start only the application layer
+make dev
 ```
 
 ### Stopping the Stack
 
 ```bash
 # Stop and remove containers, networks
-docker compose down
+make down      # or: docker compose --profile full down
 
 # Stop and remove containers, networks, AND volumes (clears MongoDB data)
-docker compose down -v
+make clean     # or: docker compose --profile full down -v --remove-orphans
 ```
 
 ### Viewing Logs
