@@ -1905,7 +1905,7 @@
         bubble.textContent = content;
       } else {
         // AI responses contain formatted HTML
-        bubble.innerHTML = content;
+        bubble.innerHTML = DOMPurify.sanitize(content);
       }
 
       msg.appendChild(avatar);
