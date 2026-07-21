@@ -151,8 +151,12 @@ router.post('/completions', async (req, res) => {
       return res.status(400).json({ message: 'habitId and dateKey are required' });
     }
 
+    // Sanitize inputs by ensuring they are strings to prevent NoSQL injection
+    const safeHabitId = String(habitId);
+    const safeDateKey = String(dateKey);
+
     // Check if habit exists and belongs to user
-    const habit = await Habit.findById(habitId);
+    const habit = await Habit.findById(safeHabitId);
     if (!habit || habit.user.toString() !== req.user.id) {
       return res.status(404).json({ message: 'Habit not found' });
     }
@@ -160,22 +164,22 @@ router.post('/completions', async (req, res) => {
     // Check if completion exists
     const existingCompletion = await Completion.findOne({
       user: req.user.id,
-      habit: habitId,
-      dateKey
+      habit: safeHabitId,
+      dateKey: safeDateKey
     });
 
     if (existingCompletion) {
       // Toggle off (delete)
       await Completion.findByIdAndDelete(existingCompletion._id);
-      res.json({ status: 'removed', habitId, dateKey });
+      res.json({ status: 'removed', habitId: safeHabitId, dateKey: safeDateKey });
     } else {
       // Toggle on (create)
       const completion = await Completion.create({
         user: req.user.id,
-        habit: habitId,
-        dateKey
+        habit: safeHabitId,
+        dateKey: safeDateKey
       });
-      res.status(201).json({ status: 'added', habitId, dateKey });
+      res.status(201).json({ status: 'added', habitId: safeHabitId, dateKey: safeDateKey });
     }
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
