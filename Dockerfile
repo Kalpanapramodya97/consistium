@@ -33,9 +33,9 @@ RUN set -e && \
 FROM nginx:1.28-alpine AS production
 
 # Upgrade all OS packages to latest patched versions.
-# This resolves Trivy CRITICAL/HIGH CVEs in libcrypto3, libssl3, libexpat,
-# libpng, libxml2, musl, musl-utils, and zlib inherited from the base image.
-RUN apk upgrade --no-cache
+# This resolves Trivy CRITICAL/HIGH CVEs (including CVE-2026-42055, CVE-2026-42533,
+# CVE-2026-49975, CVE-2026-9256) in nginx, libcrypto3, libssl3, musl, and zlib.
+RUN apk upgrade --no-cache && apk add --no-cache --upgrade nginx
 
 # OCI Image Labels (standard metadata for registries & scanners)
 LABEL org.opencontainers.image.title="Consistium" \
