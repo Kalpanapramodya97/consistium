@@ -31,6 +31,7 @@ LABEL org.opencontainers.image.title="Consistium Backend" \
 
 # Upgrade OS packages to patched versions and install dumb-init for proper PID 1 signal handling
 # (ensures graceful shutdown — SIGTERM forwarded to Node process)
+#hadolint ignore=DL3018
 RUN apk upgrade --no-cache && apk add --no-cache dumb-init
 
 WORKDIR /usr/src/app

@@ -1,6 +1,7 @@
 FROM alpine:3.22
 
 # Upgrade OS packages to patched versions and install required dependencies
+#hadolint ignore=DL3018
 RUN apk upgrade --no-cache && apk add --no-cache ansible nodejs jq bash curl git
 
 # Install Security Scanners (Trivy & TruffleHog)
