@@ -396,6 +396,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          pull: true # Ensure fresh base image layers are pulled from registry
           load: true # Load image into Docker daemon so Trivy can scan it
           tags: habit-tracker:${{ github.sha }}
           cache-from: type=gha

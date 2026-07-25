@@ -30,7 +30,7 @@ RUN set -e && \
     echo "── All assets validated ──"
 
 # ── Stage 2: Production Image ────────────────────────────────
-FROM nginx:1.28-alpine AS production
+FROM nginx:alpine AS production
 
 # Upgrade all OS packages to latest patched versions.
 # This resolves Trivy CRITICAL/HIGH CVEs (including CVE-2026-42055, CVE-2026-42533,
