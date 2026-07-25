@@ -29,9 +29,9 @@ LABEL org.opencontainers.image.title="Consistium Backend" \
   org.opencontainers.image.licenses="AGPL-3.0" \
   org.opencontainers.image.vendor="Consistium"
 
-# Install dumb-init for proper PID 1 signal handling
+# Upgrade OS packages to patched versions and install dumb-init for proper PID 1 signal handling
 # (ensures graceful shutdown — SIGTERM forwarded to Node process)
-RUN apk add --no-cache dumb-init
+RUN apk upgrade --no-cache && apk add --no-cache dumb-init
 
 WORKDIR /usr/src/app
 

@@ -1,7 +1,7 @@
-FROM alpine:latest
+FROM alpine:3.22
 
-# Install required dependencies
-RUN apk add --no-cache ansible nodejs jq bash curl git
+# Upgrade OS packages to patched versions and install required dependencies
+RUN apk upgrade --no-cache && apk add --no-cache ansible nodejs jq bash curl git
 
 # Install Security Scanners (Trivy & TruffleHog)
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
