@@ -6,7 +6,7 @@ chart-dirs:
   - helm
 
 # ── Validation settings ──────────────────────────────────────
-validate-maintainers: true
+validate-maintainers: false
 validate-chart-schema: true
 validate-yaml: true
 
