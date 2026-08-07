@@ -132,6 +132,111 @@ jobs:
         working-directory: ./terraform
         run: tflint -f compact
 
+  helm-chart-test:
+    name: Helm Chart Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.15.2
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.6/kubeconform-linux-amd64.tar.gz | tar xz -C /usr/local/bin
+          kubeconform -v
+
+      - name: Helm Lint — Default Values
+        run: helm lint ./helm/consistium --strict
+
+      - name: Helm Lint — Dev Environment
+        run: helm lint ./helm/consistium -f helm/environments/dev.yaml --strict
+
+      - name: Helm Lint — Staging Environment
+        run: helm lint ./helm/consistium -f helm/environments/staging.yaml --strict
+
+      - name: Helm Lint — Prod Environment
+        run: helm lint ./helm/consistium -f helm/environments/prod.yaml --strict
+
+      - name: Helm Template — Default Values
+        run: |
+          mkdir -p rendered-manifests/default
+          helm template consistium ./helm/consistium > rendered-manifests/default/manifests.yaml
+          echo "✅ Default template rendered successfully"
+
+      - name: Helm Template — Dev Environment
+        run: |
+          mkdir -p rendered-manifests/dev
+          helm template consistium ./helm/consistium -f helm/environments/dev.yaml > rendered-manifests/dev/manifests.yaml
+          echo "✅ Dev template rendered successfully"
+
+      - name: Helm Template — Staging Environment
+        run: |
+          mkdir -p rendered-manifests/staging
+          helm template consistium ./helm/consistium -f helm/environments/staging.yaml > rendered-manifests/staging/manifests.yaml
+          echo "✅ Staging template rendered successfully"
+
+      - name: Helm Template — Prod Environment
+        run: |
+          mkdir -p rendered-manifests/prod
+          helm template consistium ./helm/consistium -f helm/environments/prod.yaml > rendered-manifests/prod/manifests.yaml
+          echo "✅ Prod template rendered successfully"
+
+      - name: Kubeconform — Validate Default Manifests
+        run: |
+          kubeconform -summary -strict \
+            -kubernetes-version 1.30.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -ignore-missing-schemas \
+            rendered-manifests/default/manifests.yaml
+
+      - name: Kubeconform — Validate Dev Manifests
+        run: |
+          kubeconform -summary -strict \
+            -kubernetes-version 1.30.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -ignore-missing-schemas \
+            rendered-manifests/dev/manifests.yaml
+
+      - name: Kubeconform — Validate Staging Manifests
+        run: |
+          kubeconform -summary -strict \
+            -kubernetes-version 1.30.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -ignore-missing-schemas \
+            rendered-manifests/staging/manifests.yaml
+
+      - name: Kubeconform — Validate Prod Manifests
+        run: |
+          kubeconform -summary -strict \
+            -kubernetes-version 1.30.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -ignore-missing-schemas \
+            rendered-manifests/prod/manifests.yaml
+
+      - name: Setup chart-testing (ct)
+        uses: helm/chart-testing-action@v2
+
+      - name: Run chart-testing lint
+        run: ct lint --config .github/ct.yaml --charts helm/consistium
+
+      - name: Upload Rendered Manifests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-rendered-manifests
+          path: rendered-manifests/
+          retention-days: 7
+
   infracost-estimation:
     name: Infracost FinOps Estimation
     runs-on: ubuntu-latest
@@ -364,7 +469,7 @@ jobs:
   docker-build-scan-push:
     name: Build, Scan & Push Docker Image
     runs-on: ubuntu-latest
-    needs: [commitlint, backup-test, quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, dast-scan, k6-load-test]
+    needs: [commitlint, backup-test, quality-checks, backend-tests, terraform-checks, helm-chart-test, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, dast-scan, k6-load-test]
     permissions:
       contents: read
       packages: write
@@ -654,7 +759,7 @@ jobs:
   security-report:
     name: Generate DevSecOps & FinOps Report
     runs-on: ubuntu-latest
-    needs: [commitlint, backup-test, quality-checks, backend-tests, terraform-checks, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, docker-build-scan-push, dast-scan, k6-load-test, sbom-filesystem]
+    needs: [commitlint, backup-test, quality-checks, backend-tests, terraform-checks, helm-chart-test, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, docker-build-scan-push, dast-scan, k6-load-test, sbom-filesystem]
     if: always() # Generate report even if scans fail — runs on PRs AND master
     # NOTE: No environment gate here — this job runs on every PR run.
     # The environment gate lives only on semantic-versioning (master-only).

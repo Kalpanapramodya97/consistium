@@ -358,13 +358,13 @@ graph TB
 
 ## CI/CD Layer
 
-The project uses a **unified** GitHub Actions workflow ([`ci-cd.yml`](file:///f:/habit-tracker/.github/workflows/ci-cd.yml)) that combines CI/CD and DevSecOps into a single pipeline with 3 phases and 13 jobs.
+The project uses a **unified** GitHub Actions workflow ([`ci-cd.yml`](file:///f:/habit-tracker/.github/workflows/ci-cd.yml)) that combines CI/CD and DevSecOps into a single pipeline with 3 phases and 15 jobs.
 
 ### Pipeline Overview
 
 | Phase | Jobs | Purpose |
 |---|---|---|
-| **Phase 1: Source Checks** (Parallel) | `quality-checks`, `backend-tests`, `terraform-checks`, `infracost-estimation`, `secret-scan`, `codeql-sast`, `trivy-fs-scan`, `dast-scan`, `k6-load-test` | Lint, test, scan, load test, and validate |
+| **Phase 1: Source Checks** (Parallel) | `commitlint`, `backup-test`, `quality-checks`, `backend-tests`, `terraform-checks`, `helm-chart-test`, `infracost-estimation`, `secret-scan`, `codeql-sast`, `trivy-fs-scan`, `dast-scan`, `k6-load-test` | Lint, test, validate Helm charts, scan, load test, and validate |
 | **Phase 2: Build & Scan** | `docker-build-scan-push` | Build Docker image, Trivy image scan, push to GHCR |
 | **Phase 3: Release & Report** | `semantic-versioning`, `security-report` | Version tagging, GitHub Release, branded security + FinOps report |
 
@@ -498,6 +498,9 @@ graph LR
 | **CodeQL** | latest | Security | Static Application Security Testing (JavaScript) |
 | **Trivy** | latest | Security | Filesystem and container image vulnerability scanning |
 | **OWASP ZAP** | latest | Security | Dynamic Application Security Testing |
+| **Helm** | v3.15.2 | Orchestration | Kubernetes package management, chart linting and templating in CI |
+| **chart-testing (ct)** | latest | Quality | Helm chart schema validation, version and maintainer checks |
+| **kubeconform** | 0.6.6 | Quality | Kubernetes manifest schema validation against official JSON schemas |
 | **Infracost** | latest | FinOps | Infrastructure cost estimation |
 | **Ansible** | — | Automation | Local security report generation playbook |
 | **Jest** | 30.4.2 | Testing | JavaScript unit testing framework |
