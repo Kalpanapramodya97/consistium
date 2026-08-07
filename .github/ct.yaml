@@ -1,0 +1,17 @@
+# chart-testing (ct) configuration
+# https://github.com/helm/chart-testing/blob/main/doc/ct_lint.md
+
+# ── Chart directories ────────────────────────────────────────
+chart-dirs:
+  - helm
+
+# ── Validation settings ──────────────────────────────────────
+validate-maintainers: true
+validate-chart-schema: true
+validate-yaml: true
+
+# ── Chart metadata checks ────────────────────────────────────
+check-version-increment: false   # Don't enforce version bump on every PR
+
+# ── Target branch for diff detection ─────────────────────────
+target-branch: main

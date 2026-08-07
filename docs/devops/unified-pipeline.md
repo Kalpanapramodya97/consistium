@@ -1,21 +1,24 @@
 # Unified CI/CD & DevSecOps Pipeline
 
-Consistium uses a single, unified pipeline defined in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) that automatically builds, tests, secures, and releases the application on every push and pull request. This pipeline orchestrates **13 discrete jobs across 3 phases**, implementing a robust "Shift-Left" security posture.
+Consistium uses a single, unified pipeline defined in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) that automatically builds, tests, secures, and releases the application on every push and pull request. This pipeline orchestrates **15 discrete jobs across 3 phases**, implementing a robust "Shift-Left" security posture.
 
 ---
 
 ## Pipeline Architecture
 
-The pipeline uses a "fan-out, fan-in" dependency graph. Eight highly parallelized quality and security checks must all pass before the Docker image is built. Finally, versioning and reporting are generated.
+The pipeline uses a "fan-out, fan-in" dependency graph. Twelve highly parallelized quality and security checks must all pass before the Docker image is built. Finally, versioning and reporting are generated.
 
 ```mermaid
 flowchart TD
     trigger(["Push / PR to main or master"])
 
     subgraph phase1 ["Phase 1 — Quality & Security"]
+        cl["commitlint"]
+        bt["backup-test"]
         qc["quality-checks"]
-        bt["backend-tests"]
+        bk["backend-tests"]
         tc["terraform-checks"]
+        hc["helm-chart-test"]
         ie["infracost-estimation"]
         ss["secret-scan"]
         sast["codeql-sast"]
@@ -35,7 +38,7 @@ flowchart TD
     end
 
     trigger --> phase1
-    qc & bt & tc & ie & ss & sast & fs & dast & k6 --> docker
+    cl & bt & qc & bk & tc & hc & ie & ss & sast & fs & dast & k6 --> docker
     docker --> semver
     sbomfs --> semver
     docker --> report
@@ -87,33 +90,40 @@ These jobs run completely in parallel, completing in minutes to provide immediat
 - Runs `terraform validate` to verify module syntax.
 - Runs **TFLint** against the `terraform/` directory.
 
-### 4. FinOps Estimation (`infracost-estimation`)
+### 4. Helm Chart Validation (`helm-chart-test`)
+- **Helm Lint**: Validates `Chart.yaml` syntax and enforces best practices with `--strict` mode against default values and all 3 environment overlays (dev, staging, prod).
+- **Helm Template**: Renders Kubernetes manifests without a live cluster for default values and all 3 environment overlays. Catches broken Go template logic, undefined variables, and incorrect indentation.
+- **Kubeconform**: Validates rendered manifests against official Kubernetes v1.30 JSON schemas. Detects invalid API versions, wrong field types, and missing required fields. Uses the CRDs catalog for custom resources (e.g., ServiceMonitor).
+- **chart-testing (ct) Lint**: Runs Helm's official chart-testing tool for YAML schema validation, chart metadata checks, and maintainer validation.
+- Uploads all rendered manifests as pipeline artifacts for review.
+
+### 5. FinOps Estimation (`infracost-estimation`)
 - Runs Infracost against the Terraform directory.
 - Estimates the monthly cost impact of infrastructure changes.
 - Exports a JSON breakdown for the final security report.
 
-### 5. Secret Scanning (`secret-scan`)
+### 6. Secret Scanning (`secret-scan`)
 - Runs **TruffleHog** via Docker against the entire commit history (`fetch-depth: 0`).
 - Looks for leaked credentials, API keys, and JWT secrets.
 - Uses `continue-on-error: true` but outputs JSON for the final report.
 
-### 6. SAST (`codeql-sast`)
+### 7. SAST (`codeql-sast`)
 - Initializes GitHub CodeQL for JavaScript.
 - Performs static analysis of the source code for vulnerabilities (e.g., injections, XSS).
 - Uploads SARIF results to GitHub's Security tab and saves for the final report.
 
-### 7. Dependency Scanning (`trivy-fs-scan`)
+### 8. Dependency Scanning (`trivy-fs-scan`)
 - Uses Aqua Trivy to scan the local filesystem (`package.json`, `package-lock.json`).
 - Targets CRITICAL and HIGH vulnerabilities only.
 - Generates JSON for the final report.
 
-### 8. DAST (`dast-scan`)
+### 9. DAST (`dast-scan`)
 - Starts the application stack using `docker compose up -d --wait`.
 - Waits for the application to report healthy status.
 - Runs OWASP ZAP baseline scan against the running container network.
 - Identifies runtime vulnerabilities like missing headers and misconfigurations.
 
-### 9. Performance & Load Testing (`k6-load-test`)
+### 10. Performance & Load Testing (`k6-load-test`)
 - Starts the application stack using `docker compose up -d --wait`.
 - Waits for the application to report healthy status.
 - Runs a **k6** load test script simulating 20 concurrent users over 50 seconds using the host network.
@@ -126,14 +136,14 @@ These jobs run completely in parallel, completing in minutes to provide immediat
 
 This phase executes only if **all** Phase 1 jobs succeed.
 
-### 10. Build, Scan & Push (`docker-build-scan-push`)
+### 11. Build, Scan & Push (`docker-build-scan-push`)
 - Configures Docker Buildx for multi-architecture support.
 - Builds the `consistium` image and loads it into the local Docker daemon.
 - **Trivy Image Scan**: Scans the compiled image for OS-level CVEs (e.g., Alpine packages).
 - **Syft SBOM (Image)**: Generates two SBOM files from the Docker image in **CycloneDX JSON** and **SPDX JSON** formats. Uploaded as 90-day pipeline artifacts.
 - Pushes the image to **GitHub Container Registry (GHCR)** automatically, tagged with the commit SHA and `latest`.
 
-### 10b. Filesystem SBOM (`sbom-filesystem`) *(runs in parallel)*
+### 11b. Filesystem SBOM (`sbom-filesystem`) *(runs in parallel)*
 - Installs backend npm dependencies for accurate package resolution.
 - Uses **Anchore Syft v1.4.1** to generate SBOMs from the project filesystem.
 - Produces **CycloneDX JSON** and **SPDX JSON** — covering all npm packages, OS packages, and source files.
@@ -143,7 +153,7 @@ This phase executes only if **all** Phase 1 jobs succeed.
 
 ## Phase 3: Release & Reporting
 
-### 11a. Semantic Versioning (`semantic-versioning`)
+### 12a. Semantic Versioning (`semantic-versioning`)
 *(Only runs on `push` to `main`/`master`)*
 - Automatically calculates the next semantic version tag (e.g., v1.2.3) based on commit history.
 - Downloads the 4 SBOM files generated in Phase 2 and attaches them to the GitHub Release as downloadable assets:
@@ -151,7 +161,7 @@ This phase executes only if **all** Phase 1 jobs succeed.
   - `sbom-fs-cyclonedx.json`, `sbom-fs-spdx.json` (Filesystem/npm)
 - Generates an HTML Release Document and emails it to the DevOps team using `dawidd6/action-send-mail`.
 
-### 11b. Security Report (`security-report`)
+### 12b. Security Report (`security-report`)
 *(Always runs, even if earlier jobs fail)*
 - Downloads JSON artifacts from TruffleHog, CodeQL, Trivy (FS & Image), Infracost, and **both SBOM scans**.
 - Executes `security/generate-report.sh`.
@@ -176,6 +186,9 @@ This phase executes only if **all** Phase 1 jobs succeed.
 | DAST | `zaproxy/action-baseline` | Workflow inline |
 | Build System | `docker/build-push-action` | `Dockerfile` |
 | **SBOM** | **`anchore/syft` v1.4.1** | **Workflow inline** |
+| **Helm Lint** | **`azure/setup-helm@v4` (v3.15.2)** | **Workflow inline** |
+| **chart-testing** | **`helm/chart-testing-action@v2`** | **`.github/ct.yaml`** |
+| **kubeconform** | **`kubeconform` v0.6.6** | **Workflow inline** |
 | Versioning | `mathieudutour/github-tag-action` | Workflow inline |
 | **Rate Limiting** | **`express-rate-limit` v7.4.0** | **`backend/middleware/rateLimiter.js`** |
 | **NoSQL Sanitize** | **`express-mongo-sanitize` v2.2.0** | **`backend/server.js`** |
