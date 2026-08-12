@@ -62,9 +62,15 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Return the image reference
+Return the image reference.
+If image.digest is set, use the immutable digest reference (repo@sha256:...).
+Otherwise, fall back to tag-based reference (repo:tag).
 */}}
 {{- define "consistium.image" -}}
+{{- if .Values.image.digest -}}
+{{- printf "%s@%s" .Values.image.repository .Values.image.digest -}}
+{{- else -}}
 {{- $tag := default .Chart.AppVersion .Values.image.tag -}}
 {{- printf "%s:%s" .Values.image.repository $tag -}}
+{{- end -}}
 {{- end }}

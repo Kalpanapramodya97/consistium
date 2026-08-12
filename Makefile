@@ -1,5 +1,6 @@
 .PHONY: help up down logs restart install test k8s-deploy k8s-delete clean \
-       dev full monitor backup restore verify-backup lint setup
+       dev full monitor backup restore verify-backup lint setup \
+       verify-image inspect-sbom
 
 # Default target
 help: ## Show this help message
@@ -74,3 +75,23 @@ k8s-deploy: ## Deploy to Kubernetes using Helm
 k8s-delete: ## Uninstall the Kubernetes Helm release
 	helm uninstall consistium -n consistium-prod
 	kubectl delete namespace consistium-prod --ignore-not-found
+
+# ── Image Signing & Verification ─────────────────────────────────────────────
+IMAGE ?= ghcr.io/kalpanapramodya97/consistium/habit-tracker:latest
+
+verify-image: ## Verify Cosign signature on a Docker image (IMAGE=ghcr.io/...)
+	@echo "── Verifying Cosign signature for $(IMAGE) ──"
+	cosign verify \
+	  --certificate-identity-regexp="https://github.com/Kalpanapramodya97/consistium/" \
+	  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+	  $(IMAGE)
+	@echo ""
+	@echo "✔ Image signature is valid and trusted."
+
+inspect-sbom: ## Inspect the SBOM attestation attached to a Docker image (IMAGE=ghcr.io/...)
+	@echo "── Inspecting SBOM attestation for $(IMAGE) ──"
+	cosign verify-attestation \
+	  --type cyclonedx \
+	  --certificate-identity-regexp="https://github.com/Kalpanapramodya97/consistium/" \
+	  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+	  $(IMAGE) | jq -r '.payload' | base64 -d | jq '.predicate'
