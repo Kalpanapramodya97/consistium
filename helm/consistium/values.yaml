@@ -11,6 +11,10 @@ image:
   pullPolicy: IfNotPresent
   # -- Overrides the image tag (default: Chart appVersion)
   tag: ""
+  # -- If set, use this digest (sha256:...) for immutable image references.
+  # When digest is set, tag is ignored. Digest guarantees the exact image
+  # that was signed and scanned is the one deployed.
+  digest: ""
 
 imagePullSecrets: []
 nameOverride: ""
