@@ -1,26 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark-theme">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description"
-    content="Consistium — An atomic habit tracker inspired by James Clear. Build consistency, one day at a time." />
+    content="Consistium v2.0 — An atomic habit tracker inspired by James Clear. Build consistency, one day at a time." />
   <title>Consistium — Atomic Habit Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,400;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
     rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
-  <!-- Ambient Background -->
-  <div class="ambient-bg">
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
+  <!-- Ambient Atmospheric Background -->
+  <div class="ambient-bg" aria-hidden="true">
+    <div class="grain-overlay"></div>
+    <div class="mesh-accent mesh-1"></div>
+    <div class="mesh-accent mesh-2"></div>
   </div>
 
   <div class="layout-wrapper" id="layoutWrapper">
@@ -49,15 +49,6 @@
               stroke-linecap="round" stroke-linejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
-            </svg>
-          </button>
-          <button class="btn-icon" id="aiAdvisorToggle" title="AI Advisor" aria-label="Toggle AI Advisor">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
-              <path d="M19 10a7 7 0 0 1-14 0" />
-              <line x1="12" y1="17" x2="12" y2="21" />
-              <line x1="8" y1="21" x2="16" y2="21" />
             </svg>
           </button>
           <button class="btn-icon" id="themeToggleBtn" title="Toggle Theme" aria-label="Toggle Theme">
@@ -277,73 +268,11 @@
 
       <!-- Footer -->
       <footer class="footer">
-        <p>Built with <span class="footer-heart">♦</span> Consistium &mdash; 1% better every day</p>
+        <p>Built with <span class="footer-heart">◆</span> Consistium &mdash; 1% better every day</p>
       </footer>
     </div><!-- /.main-content -->
-
-    <!-- AI Habit Advisor Panel (Right Side) -->
-    <aside class="ai-advisor-panel" id="aiAdvisorPanel">
-      <div class="ai-panel-header">
-        <div class="ai-header-left">
-          <div class="ai-avatar">
-            <div class="ai-avatar-ring"></div>
-            <span class="ai-avatar-icon">🧠</span>
-          </div>
-          <div class="ai-header-info">
-            <h3 class="ai-title">AI Habit Coach</h3>
-            <span class="ai-status" id="aiStatus">
-              <span class="ai-status-dot"></span>
-              Ready to help
-            </span>
-          </div>
-        </div>
-        <button class="btn-icon ai-close-btn" id="aiCloseBtn" title="Close Panel" aria-label="Close AI Panel">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
-
-      <div class="ai-messages" id="aiMessages">
-        <!-- Messages will be rendered here -->
-      </div>
-
-      <div class="ai-suggestions" id="aiSuggestions">
-        <div class="ai-suggestions-label">Quick Actions</div>
-        <div class="ai-chips">
-          <button class="ai-chip" data-action="analyze">📊 Analyze my habits</button>
-          <button class="ai-chip" data-action="suggest">💡 Suggest new habits</button>
-          <button class="ai-chip" data-action="motivation">🔥 Motivate me</button>
-          <button class="ai-chip" data-action="streak">📈 Streak tips</button>
-          <button class="ai-chip" data-action="science">🔬 Habit science</button>
-          <button class="ai-chip" data-action="morning">🌅 Morning routine</button>
-          <button class="ai-chip" data-action="breaking">🚫 Break bad habits</button>
-          <button class="ai-chip" data-action="stacking">🔗 Habit stacking</button>
-        </div>
-      </div>
-
-      <div class="ai-input-area">
-        <div class="ai-input-wrapper">
-          <input type="text" class="ai-input" id="aiInput" placeholder="Ask for habit advice..." autocomplete="off" />
-          <button class="ai-send-btn" id="aiSendBtn" title="Send" aria-label="Send message">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </aside>
   </div><!-- /.layout-wrapper -->
 
-  <!-- Mobile AI Advisor FAB -->
-  <button class="ai-fab" id="aiFab" title="AI Habit Coach" aria-label="Open AI Coach">
-    <span class="ai-fab-icon">🧠</span>
-    <span class="ai-fab-pulse"></span>
-  </button>
   <!-- Add/Edit Habit Modal -->
   <div class="modal-overlay" id="habitModal" style="display: none;">
     <div class="modal">
