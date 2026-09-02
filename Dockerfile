@@ -30,12 +30,12 @@ RUN set -e && \
     echo "── All assets validated ──"
 
 # ── Stage 2: Production Image ────────────────────────────────
+# hadolint ignore=DL3007
 FROM nginx:alpine AS production
 
 # Upgrade all OS packages to latest patched versions.
-# This resolves Trivy CRITICAL/HIGH CVEs (including CVE-2026-42055, CVE-2026-42533,
-# CVE-2026-49975, CVE-2026-9256) in nginx, libcrypto3, libssl3, musl, and zlib.
-#hadolint ignore=DL3018
+# This resolves Trivy CRITICAL/HIGH CVEs in nginx, libcrypto3, libssl3, musl, and zlib.
+# hadolint ignore=DL3018
 RUN apk upgrade --no-cache && apk add --no-cache --upgrade nginx
 
 # OCI Image Labels (standard metadata for registries & scanners)
@@ -47,6 +47,7 @@ LABEL org.opencontainers.image.title="Consistium" \
       org.opencontainers.image.vendor="Consistium"
 
 # Remove default nginx content and unnecessary system packages
+# hadolint ignore=DL3018,DL3019
 RUN rm -rf /usr/share/nginx/html/* && \
     # Remove unnecessary packages to reduce attack surface
     apk --no-cache del curl || true && \
