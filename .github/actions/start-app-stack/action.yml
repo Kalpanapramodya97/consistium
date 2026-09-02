@@ -1,0 +1,47 @@
+name: Start Application Stack
+description: Boot docker-compose stack and wait for HTTP readiness
+
+inputs:
+  port:
+    description: Port to health-check against
+    required: false
+    default: '3000'
+  max-attempts:
+    description: Maximum readiness probe attempts (5s apart)
+    required: false
+    default: '30'
+
+runs:
+  using: composite
+  steps:
+    - name: Start Application Stack
+      shell: bash
+      run: |
+        docker compose up -d --build --wait consistium backend mongodb || true
+        echo "=== Container Status ==="
+        docker compose ps -a
+        echo "=== Backend Logs ==="
+        docker compose logs backend
+        echo "=== MongoDB Logs ==="
+        docker compose logs mongodb
+        # Verify backend is actually running
+        if ! docker compose ps backend | grep -q "running\|Up"; then
+          echo "ERROR: Backend container is not running!"
+          exit 1
+        fi
+
+    - name: Wait for Application to be Ready
+      shell: bash
+      run: |
+        echo "Waiting for application at http://localhost:${{ inputs.port }}..."
+        for i in $(seq 1 ${{ inputs.max-attempts }}); do
+          if curl -s -o /dev/null -w "%{http_code}" http://localhost:${{ inputs.port }} | grep -q "200"; then
+            echo "✅ Application is up and running!"
+            exit 0
+          fi
+          echo "Attempt $i/${{ inputs.max-attempts }} — Waiting..."
+          sleep 5
+        done
+        echo "❌ Application failed to start!"
+        docker compose logs
+        exit 1

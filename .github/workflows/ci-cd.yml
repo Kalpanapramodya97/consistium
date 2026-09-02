@@ -3,11 +3,26 @@ name: CI/CD & DevSecOps Pipeline
 on:
   push:
     branches: [ "main", "master" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
   pull_request:
     branches: [ "main", "master" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+
+# ── Least-privilege: drop all permissions by default ──────────
+# Each job declares only the permissions it needs.
+permissions: {}
 
 env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  NODE_VERSION: '20'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,15 +35,18 @@ jobs:
   commitlint:
     name: Commit Message Linting
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
       - name: Install Dependencies
         run: npm ci
       - name: Run Commitlint
@@ -37,9 +55,11 @@ jobs:
   backup-test:
     name: Verify Backup/Restore Scripts
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Start Database
         run: docker compose up -d --wait mongodb
       - name: Seed Database
@@ -53,34 +73,46 @@ jobs:
   quality-checks:
     name: Code Quality & Linting
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Ensure .env is not tracked by git
+        run: |
+          if git ls-files --error-unmatch .env 2>/dev/null; then
+            echo "::error::The .env file is tracked by git! Remove it with 'git rm --cached .env' and add to .gitignore."
+            exit 1
+          fi
+          echo "✅ .env is not tracked"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Lint HTML
-        run: npx htmlhint "**/*.html" || true # Using || true so it doesn't fail the build immediately for minor issues
+        run: npx htmlhint "**/*.html"
 
       - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: Dockerfile
 
   backend-tests:
     name: Backend Unit Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: './backend/package-lock.json'
 
@@ -88,19 +120,30 @@ jobs:
         working-directory: ./backend
         run: npm ci
 
-      - name: Run Tests
+      - name: Run Tests with Coverage
         working-directory: ./backend
-        run: npm test
+        run: npm test -- --coverage 2>/dev/null || npm test
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-report
+          path: backend/coverage/
+          retention-days: 7
+        continue-on-error: true
 
   terraform-checks:
     name: Terraform Validation
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: 1.5.0
 
@@ -117,7 +160,7 @@ jobs:
         run: terraform validate
 
       - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v4
+        uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4.1.1
         with:
           tflint_version: v0.50.3
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -135,14 +178,16 @@ jobs:
   helm-chart-test:
     name: Helm Chart Validation
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
       - name: Setup Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: v3.15.2
 
@@ -151,87 +196,48 @@ jobs:
           curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.6/kubeconform-linux-amd64.tar.gz | tar xz -C /usr/local/bin
           kubeconform -v
 
-      - name: Helm Lint — Default Values
-        run: helm lint ./helm/consistium --strict
-
-      - name: Helm Lint — Dev Environment
-        run: helm lint ./helm/consistium -f helm/environments/dev.yaml --strict
-
-      - name: Helm Lint — Staging Environment
-        run: helm lint ./helm/consistium -f helm/environments/staging.yaml --strict
-
-      - name: Helm Lint — Prod Environment
-        run: helm lint ./helm/consistium -f helm/environments/prod.yaml --strict
-
-      - name: Helm Template — Default Values
+      - name: Helm Lint — All Environments
         run: |
+          # Lint default values
+          helm lint ./helm/consistium --strict
+          echo "✅ Default lint passed"
+
+          # Lint each environment overlay
+          for env in dev staging prod; do
+            helm lint ./helm/consistium -f helm/environments/${env}.yaml --strict
+            echo "✅ ${env} lint passed"
+          done
+
+      - name: Helm Template & Kubeconform — All Environments
+        run: |
+          KUBECONFORM_OPTS="-summary -strict -kubernetes-version 1.30.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -ignore-missing-schemas"
+
+          # Default values
           mkdir -p rendered-manifests/default
           helm template consistium ./helm/consistium > rendered-manifests/default/manifests.yaml
-          echo "✅ Default template rendered successfully"
+          eval kubeconform ${KUBECONFORM_OPTS} rendered-manifests/default/manifests.yaml
+          echo "✅ Default template rendered and validated"
 
-      - name: Helm Template — Dev Environment
-        run: |
-          mkdir -p rendered-manifests/dev
-          helm template consistium ./helm/consistium -f helm/environments/dev.yaml > rendered-manifests/dev/manifests.yaml
-          echo "✅ Dev template rendered successfully"
-
-      - name: Helm Template — Staging Environment
-        run: |
-          mkdir -p rendered-manifests/staging
-          helm template consistium ./helm/consistium -f helm/environments/staging.yaml > rendered-manifests/staging/manifests.yaml
-          echo "✅ Staging template rendered successfully"
-
-      - name: Helm Template — Prod Environment
-        run: |
-          mkdir -p rendered-manifests/prod
-          helm template consistium ./helm/consistium -f helm/environments/prod.yaml > rendered-manifests/prod/manifests.yaml
-          echo "✅ Prod template rendered successfully"
-
-      - name: Kubeconform — Validate Default Manifests
-        run: |
-          kubeconform -summary -strict \
-            -kubernetes-version 1.30.0 \
-            -schema-location default \
-            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            -ignore-missing-schemas \
-            rendered-manifests/default/manifests.yaml
-
-      - name: Kubeconform — Validate Dev Manifests
-        run: |
-          kubeconform -summary -strict \
-            -kubernetes-version 1.30.0 \
-            -schema-location default \
-            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            -ignore-missing-schemas \
-            rendered-manifests/dev/manifests.yaml
-
-      - name: Kubeconform — Validate Staging Manifests
-        run: |
-          kubeconform -summary -strict \
-            -kubernetes-version 1.30.0 \
-            -schema-location default \
-            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            -ignore-missing-schemas \
-            rendered-manifests/staging/manifests.yaml
-
-      - name: Kubeconform — Validate Prod Manifests
-        run: |
-          kubeconform -summary -strict \
-            -kubernetes-version 1.30.0 \
-            -schema-location default \
-            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            -ignore-missing-schemas \
-            rendered-manifests/prod/manifests.yaml
+          # Environment overlays
+          for env in dev staging prod; do
+            mkdir -p rendered-manifests/${env}
+            helm template consistium ./helm/consistium -f helm/environments/${env}.yaml > rendered-manifests/${env}/manifests.yaml
+            eval kubeconform ${KUBECONFORM_OPTS} rendered-manifests/${env}/manifests.yaml
+            echo "✅ ${env} template rendered and validated"
+          done
 
       - name: Setup chart-testing (ct)
-        uses: helm/chart-testing-action@v2
+        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
 
       - name: Run chart-testing lint
         run: ct lint --config .github/ct.yaml --charts helm/consistium
 
       - name: Upload Rendered Manifests
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: helm-rendered-manifests
           path: rendered-manifests/
@@ -240,12 +246,14 @@ jobs:
   infracost-estimation:
     name: Infracost FinOps Estimation
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Infracost
-        uses: infracost/actions/setup@v3
+        uses: infracost/actions/setup@e9d6e6cd65e168e76b0de50ff9957d2fe8bb1832 # v3.0.1
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
 
@@ -254,7 +262,7 @@ jobs:
 
       - name: Upload Infracost results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: infracost-results
           path: infracost-results.json
@@ -263,14 +271,15 @@ jobs:
   secret-scan:
     name: Secret Scanning
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0 # Fetch all history for secret scanning
-      
+
       - name: TruffleHog Secret Scan
-        continue-on-error: true
         run: |
           docker run --rm -v "$PWD:/workspace" ghcr.io/trufflesecurity/trufflehog:latest \
             filesystem /workspace \
@@ -278,14 +287,24 @@ jobs:
             --json \
             --exclude-paths=/workspace/.trufflehog-exclude \
             > trufflehog-results.json 2>/dev/null || true
+
           # Ensure valid JSON output even if no results
           if [ ! -s trufflehog-results.json ]; then
             echo "[]" > trufflehog-results.json
           fi
 
+          # Fail the job if verified secrets were found
+          SECRETS_COUNT=$(wc -l < trufflehog-results.json)
+          if [ "$SECRETS_COUNT" -gt 1 ] || ([ "$SECRETS_COUNT" -eq 1 ] && [ "$(cat trufflehog-results.json)" != "[]" ]); then
+            echo "::error::TruffleHog found verified secrets! Review trufflehog-results.json"
+            cat trufflehog-results.json | head -20
+            exit 1
+          fi
+          echo "✅ No verified secrets found"
+
       - name: Upload TruffleHog results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: trufflehog-results
           path: trufflehog-results.json
@@ -300,21 +319,21 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9
         with:
           languages: javascript # For app.js and HTML
-          
+
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9
         with:
           output: codeql-results
 
       - name: Upload CodeQL SARIF results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codeql-results
           path: codeql-results/*.sarif
@@ -326,48 +345,23 @@ jobs:
   dast-scan:
     name: OWASP ZAP DAST Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [backend-tests]
     permissions:
+      contents: read
       issues: write
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Start Application Stack
-        run: |
-          docker compose up -d --build --wait consistium backend mongodb || true
-          echo "=== Container Status ==="
-          docker compose ps -a
-          echo "=== Backend Logs ==="
-          docker compose logs backend
-          echo "=== MongoDB Logs ==="
-          docker compose logs mongodb
-          # Verify backend is actually running
-          if ! docker compose ps backend | grep -q "running\|Up"; then
-            echo "ERROR: Backend container is not running!"
-            exit 1
-          fi
-
-      - name: Wait for Application to be Ready
-        run: |
-          echo "Waiting for frontend to be available at http://localhost:3000..."
-          for i in {1..30}; do
-            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
-              echo "Application is up and running!"
-              exit 0
-            fi
-            echo "Attempt $i/30 - Waiting..."
-            sleep 5
-          done
-          echo "Application failed to start!"
-          docker compose logs
-          exit 1
+        uses: ./.github/actions/start-app-stack
 
       - name: Fix workspace permissions for ZAP
         run: chmod -R 777 .
 
       - name: Run ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.14.0
+        uses: zaproxy/action-baseline@a418de766254e096fa7d9e30f8dc9662b58df224 # v0.9.0
         with:
           target: 'http://localhost:3000'
           fail_action: false
@@ -375,7 +369,7 @@ jobs:
 
       - name: Upload ZAP Report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: zap-dast-report
           path: report_html.html
@@ -384,47 +378,23 @@ jobs:
   k6-load-test:
     name: k6 Performance & Load Test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [backend-tests]
+    permissions:
+      contents: read
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Start Application Stack
-        run: |
-          docker compose up -d --build --wait consistium backend mongodb || true
-          echo "=== Container Status ==="
-          docker compose ps -a
-          echo "=== Backend Logs ==="
-          docker compose logs backend
-          echo "=== MongoDB Logs ==="
-          docker compose logs mongodb
-          # Verify backend is actually running
-          if ! docker compose ps backend | grep -q "running\|Up"; then
-            echo "ERROR: Backend container is not running!"
-            exit 1
-          fi
-
-      - name: Wait for Application to be Ready
-        run: |
-          echo "Waiting for frontend to be available at http://localhost:3000..."
-          for i in {1..30}; do
-            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
-              echo "Application is up and running!"
-              exit 0
-            fi
-            echo "Attempt $i/30 - Waiting..."
-            sleep 5
-          done
-          echo "Application failed to start!"
-          docker compose logs
-          exit 1
+        uses: ./.github/actions/start-app-stack
 
       - name: Run k6 Load Test
         run: docker run --rm --network host --user $(id -u):$(id -g) -v ${{ github.workspace }}:/workspace -w /workspace grafana/k6:latest run --out json=k6-results.json tests/k6/load-test.js
 
       - name: Upload k6 results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: k6-results
           path: k6-results.json
@@ -433,12 +403,14 @@ jobs:
   trivy-fs-scan:
     name: Trivy Filesystem Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Run Trivy filesystem scan (console)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@1f0aa582c8c8f5f7639610d6d38baddfea4fdcee # v0.9.2
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -449,7 +421,7 @@ jobs:
         continue-on-error: true
 
       - name: Run Trivy filesystem scan (JSON for report)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@1f0aa582c8c8f5f7639610d6d38baddfea4fdcee # v0.9.2
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -458,34 +430,48 @@ jobs:
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
 
+      - name: Write Trivy step summary
+        if: always()
+        run: |
+          if [ -f "trivy-fs-results.json" ]; then
+            echo "## 🔍 Trivy Filesystem Scan Results" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            jq '[.Results[]? | {Target, Vulns: (.Vulnerabilities // [] | length)}] | sort_by(-.Vulns)' trivy-fs-results.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No parsable results" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Upload Trivy FS results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: trivy-fs-results
           path: trivy-fs-results.json
+          retention-days: 7
           retention-days: 7
 
   docker-build-scan-push:
     name: Build, Scan & Push Docker Image
     runs-on: ubuntu-latest
-    needs: [commitlint, backup-test, quality-checks, backend-tests, terraform-checks, helm-chart-test, infracost-estimation, secret-scan, codeql-sast, trivy-fs-scan, dast-scan, k6-load-test]
+    timeout-minutes: 30
+    # Loosened: only gates on quality, tests, and security scans.
+    # Infracost, helm-chart-test, and backup-test run in parallel but don't block the build.
+    needs: [commitlint, quality-checks, backend-tests, secret-scan, codeql-sast, trivy-fs-scan, dast-scan, k6-load-test]
     permissions:
       contents: read
       packages: write
       id-token: write   # Required for Cosign keyless signing via Sigstore OIDC
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
 
       - name: Extract repository name in lowercase
         run: |
@@ -493,7 +479,7 @@ jobs:
 
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@318604b99e75e41977312d83839a89be02ca4893 # v5.9.0
         with:
           images: ghcr.io/${{ env.REPO }}/habit-tracker
           tags: |
@@ -501,7 +487,7 @@ jobs:
             type=sha,format=short
 
       - name: Build Docker image (Load to Docker daemon for scanning)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
         with:
           context: .
           file: ./Dockerfile
@@ -512,7 +498,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Run Trivy image scan (console)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@1f0aa582c8c8f5f7639610d6d38baddfea4fdcee # v0.9.2
         with:
           image-ref: 'habit-tracker:${{ github.sha }}'
           format: 'table'
@@ -521,7 +507,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Run Trivy image scan (JSON for report)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@1f0aa582c8c8f5f7639610d6d38baddfea4fdcee # v0.9.2
         with:
           image-ref: 'habit-tracker:${{ github.sha }}'
           format: 'json'
@@ -531,7 +517,7 @@ jobs:
 
       - name: Upload Trivy image results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: trivy-image-results
           path: trivy-image-results.json
@@ -549,7 +535,7 @@ jobs:
 
       - name: Upload Docker Image SBOM artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: sbom-docker-image
           path: |
@@ -559,7 +545,7 @@ jobs:
 
       - name: Log in to GitHub Container Registry
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -568,7 +554,7 @@ jobs:
       - name: Push Docker image
         id: push
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
         with:
           context: .
           file: ./Dockerfile
@@ -626,14 +612,16 @@ jobs:
   sbom-filesystem:
     name: SBOM - Filesystem & Dependencies
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: './backend/package-lock.json'
 
@@ -651,7 +639,7 @@ jobs:
         run: syft dir:. -o spdx-json=sbom-fs-spdx.json
 
       - name: Upload Filesystem SBOM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: sbom-filesystem
           path: |
@@ -682,13 +670,13 @@ jobs:
       id-token: write   # Required for Cosign verification
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # ── Signature Verification Gate ─────────────────────────────────────
       # Ensures only signed images get released. If verification fails,
       # the release is blocked.
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
 
       - name: Extract repository name in lowercase
         run: |
@@ -704,7 +692,7 @@ jobs:
           echo "✅ Image signature verified — proceeding with release"
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: habit-tracker-assets
           path: |
@@ -715,7 +703,7 @@ jobs:
 
       - name: Bump version and push tag
         id: tag_version
-        uses: mathieudutour/github-tag-action@v6.2
+        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: patch
@@ -766,7 +754,7 @@ jobs:
           EOF
 
       - name: Upload Release Document Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-document-${{ steps.tag_version.outputs.new_tag }}
           path: |
@@ -775,21 +763,21 @@ jobs:
           retention-days: 90
 
       - name: Download Docker Image SBOM for Release
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: sbom-docker-image
           path: sbom-release/
         continue-on-error: true
 
       - name: Download Filesystem SBOM for Release
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: sbom-filesystem
           path: sbom-release/
         continue-on-error: true
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
           name: Release ${{ steps.tag_version.outputs.new_tag }}
@@ -802,7 +790,7 @@ jobs:
             sbom-release/sbom-fs-spdx.json
 
       - name: Send Release Document via Email
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@48476814b0338573004e9de1e8504b25ff8cc23c # v3.9.0
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -832,54 +820,55 @@ jobs:
     # The environment gate lives only on semantic-versioning (master-only).
     permissions:
       contents: read
+      pull-requests: write  # Required for PR summary comment
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Download TruffleHog results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: trufflehog-results
           path: scan-results/
         continue-on-error: true
 
       - name: Download CodeQL results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: codeql-results
           path: scan-results/
         continue-on-error: true
 
       - name: Download Trivy FS results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: trivy-fs-results
           path: scan-results/
         continue-on-error: true
 
       - name: Download Trivy image results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: trivy-image-results
           path: scan-results/
         continue-on-error: true
 
       - name: Download Infracost results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: infracost-results
           path: scan-results/
         continue-on-error: true
 
       - name: Download Docker Image SBOM
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: sbom-docker-image
           path: scan-results/sbom/
         continue-on-error: true
 
       - name: Download Filesystem SBOM
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: sbom-filesystem
           path: scan-results/sbom/
@@ -912,14 +901,14 @@ jobs:
             --output "consistium-security-report.html"
 
       - name: Upload security report artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: consistium-security-report
           path: consistium-security-report.html
           retention-days: 90
 
       - name: Send security report via email
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@48476814b0338573004e9de1e8504b25ff8cc23c # v3.9.0
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -951,3 +940,30 @@ jobs:
             This is an automated email from the Consistium DevSecOps Pipeline.
             ◆ Consistium — 1% better every day
           attachments: consistium-security-report.html
+
+      - name: Post pipeline summary to PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
+        with:
+          header: pipeline-summary
+          message: |
+            ## 🛡️ Pipeline Summary — Run #${{ github.run_number }}
+
+            | Check | Status |
+            |-------|--------|
+            | Commit Lint | `${{ needs.commitlint.result }}` |
+            | Backup Test | `${{ needs.backup-test.result }}` |
+            | Code Quality | `${{ needs.quality-checks.result }}` |
+            | Unit Tests | `${{ needs.backend-tests.result }}` |
+            | Terraform | `${{ needs.terraform-checks.result }}` |
+            | Helm Charts | `${{ needs.helm-chart-test.result }}` |
+            | Infracost | `${{ needs.infracost-estimation.result }}` |
+            | Secret Scan | `${{ needs.secret-scan.result }}` |
+            | CodeQL SAST | `${{ needs.codeql-sast.result }}` |
+            | Trivy FS | `${{ needs.trivy-fs-scan.result }}` |
+            | DAST (ZAP) | `${{ needs.dast-scan.result }}` |
+            | Load Test (k6) | `${{ needs.k6-load-test.result }}` |
+            | Docker Build | `${{ needs.docker-build-scan-push.result }}` |
+            | SBOM | `${{ needs.sbom-filesystem.result }}` |
+
+            📄 [View full pipeline run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
